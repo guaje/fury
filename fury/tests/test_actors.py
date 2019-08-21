@@ -974,5 +974,79 @@ def test_grid(_interactive=False):
     npt.assert_equal(report.objects > 6, True)
 
 
+def test_sphere_min():
+    from fury.utils import numpy_to_vtk_points, numpy_to_vtk_colors, set_polydata_colors
+    import vtk
+    np.random.seed(42)
+    centers = np.random.rand(100, 3)
+    colors = 255 * np.random.rand(100, 3)
+
+    vtk_points = numpy_to_vtk_points(centers)
+
+    points_polydata = vtk.vtkPolyData()
+    points_polydata.SetPoints(vtk_points)
+
+    vertex_filter = vtk.vtkVertexGlyphFilter()
+    vertex_filter.SetInputData(points_polydata)
+    vertex_filter.Update()
+
+    polydata = vtk.vtkPolyData()
+    polydata.ShallowCopy(vertex_filter.GetOutput())
+
+    set_polydata_colors(polydata, colors)
+
+    mapper = vtk.vtkPolyDataMapper()
+    mapper.SetInputData(polydata)
+
+    points_actor = vtk.vtkActor()
+    points_actor.SetMapper(mapper)
+    points_actor.GetProperty().SetPointSize(50)
+    points_actor.GetProperty().SetRenderPointsAsSpheres(True)
+
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Fragment,
+        '//VTK::Light::Dec',
+        True,
+        '''
+        // include the default
+        //VTK::Light::Dec
+        uniform float radius;
+        ''',
+        False
+    )
+
+    import itertools
+    counter = itertools.count(start=1)
+
+    @window.vtk.calldata_type(window.vtk.VTK_OBJECT)
+    def vtk_shader_callback(caller, event, calldata=None):
+        program = calldata
+        if program is not None:
+            try:
+                program.SetUniformf("radius", .01 * next(counter))
+            except ValueError:
+                pass
+
+    mapper.AddObserver(window.vtk.vtkCommand.UpdateShaderEvent, vtk_shader_callback)
+
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Fragment,
+        '//VTK::Light::Impl',  # target the Color block
+        True,
+        '''
+        // include the default
+        //VTK::Light::Impl
+        fragOutput0.a = radius;
+        //gl_FragDepth = radius * gl_FragDepth;
+        abs
+        ''',
+        False
+    )
+
+    scene = window.Scene()
+    scene.add(points_actor)
+    window.show(scene, order_transparent=True)
+
+
 if __name__ == "__main__":
     npt.run_module_suite()

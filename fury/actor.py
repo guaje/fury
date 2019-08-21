@@ -1357,20 +1357,23 @@ def dots(points, color=(1, 0, 0), opacity=1, dot_size=5):
 
     polyVertexPoints = vtk.vtkPoints()
     polyVertexPoints.SetNumberOfPoints(points_no)
-    aPolyVertex = vtk.vtkPolyVertex()
-    aPolyVertex.GetPointIds().SetNumberOfIds(points_no)
+    #aPolyVertex = vtk.vtkPolyVertex()
+    #aPolyVertex.GetPointIds().SetNumberOfIds(points_no)
 
-    cnt = 0
+    #cnt = 0
     if points.ndim > 1:
         for point in points:
-            polyVertexPoints.InsertPoint(cnt, point[0], point[1], point[2])
-            aPolyVertex.GetPointIds().SetId(cnt, cnt)
-            cnt += 1
+            #polyVertexPoints.InsertPoint(cnt, point[0], point[1], point[2])
+            polyVertexPoints.InsertNextPoint(point[0], point[1], point[2])
+            #aPolyVertex.GetPointIds().SetId(cnt, cnt)
+            #cnt += 1
     else:
-        polyVertexPoints.InsertPoint(cnt, points[0], points[1], points[2])
-        aPolyVertex.GetPointIds().SetId(cnt, cnt)
-        cnt += 1
+        polyVertexPoints.InsertNextPoint(points[0], points[1], points[2])
+        #polyVertexPoints.InsertPoint(cnt, points[0], points[1], points[2])
+        #aPolyVertex.GetPointIds().SetId(cnt, cnt)
+        #cnt += 1
 
+    """
     aPolyVertexGrid = vtk.vtkUnstructuredGrid()
     aPolyVertexGrid.Allocate(1, 1)
     aPolyVertexGrid.InsertNextCell(aPolyVertex.GetCellType(),
@@ -1385,8 +1388,19 @@ def dots(points, color=(1, 0, 0), opacity=1, dot_size=5):
     aPolyVertexActor.GetProperty().SetColor(color)
     aPolyVertexActor.GetProperty().SetOpacity(opacity)
     aPolyVertexActor.GetProperty().SetPointSize(dot_size)
+    
     return aPolyVertexActor
-
+    """
+    pnts = numpy_to_vtk_points(points)
+    cols = numpy_to_vtk_colors(color)
+    polydata = vtk.vtkPolyData()
+    polydata.SetPoints(pnts)
+    mapper = vtk.vtkPolyDataMapper()
+    mapper.SetInputData(polydata)
+    actor = vtk.vtkActor()
+    actor.SetMapper(mapper)
+    actor.GetProperty().SetPointSize(dot_size)
+    return actor
 
 def point(points, colors, _opacity=1., point_radius=0.1, theta=8, phi=8):
     """Visualize points as sphere glyphs
@@ -1999,3 +2013,8 @@ def grid(actors, captions=None, caption_offset=(0, -100, 0), cell_padding=0,
 
     grid.add(*actors)
     return grid
+
+
+def sphere_min(centers, colors, radii=1., theta=16, phi=16, vertices=None, faces=None):
+    dots_actor = dots(centers, colors[:3], colors[3], radii)
+    return dots_actor
