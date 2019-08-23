@@ -975,7 +975,7 @@ def test_grid(_interactive=False):
 
 
 def test_sphere_min():
-    from fury.utils import numpy_to_vtk_points, numpy_to_vtk_colors, set_polydata_colors
+    from fury.utils import numpy_to_vtk_points, set_polydata_colors
     import vtk
     np.random.seed(42)
     centers = np.random.rand(100, 3)
@@ -1008,7 +1008,6 @@ def test_sphere_min():
         '//VTK::Light::Dec',
         True,
         '''
-        // include the default
         //VTK::Light::Dec
         uniform float radius;
         ''',
@@ -1031,20 +1030,23 @@ def test_sphere_min():
 
     mapper.AddShaderReplacement(
         vtk.vtkShader.Fragment,
-        '//VTK::Light::Impl',  # target the Color block
+        '//VTK::Light::Impl',
         True,
         '''
-        // include the default
-        //VTK::Light::Impl
-        fragOutput0.a = radius;
-        //gl_FragDepth = radius * gl_FragDepth;
-        abs
+        vec3 color = vec3(1., .0, .0);
+        vec3 direction = normalize(vec3(1.));
+        
+        float df = max(0, dot(direction, normalVCVSOutput));
+        float sf = pow(df, 24.);
+        
+        fragOutput0 = vec4(max(df*color, sf*vec3(1.)), 1.);
         ''',
         False
     )
 
     scene = window.Scene()
     scene.add(points_actor)
+    scene.background((1, 1, 1))
     window.show(scene, order_transparent=True)
 
 
