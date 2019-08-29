@@ -978,8 +978,9 @@ def test_sphere_min():
     from fury.utils import numpy_to_vtk_points, set_polydata_colors
     import vtk
     np.random.seed(42)
-    centers = np.random.rand(100, 3)
-    colors = 255 * np.random.rand(100, 3)
+    n_points = 1
+    centers = np.random.rand(n_points, 3)
+    colors = 255 * np.random.rand(n_points, 3)
 
     vtk_points = numpy_to_vtk_points(centers)
 
@@ -1000,7 +1001,7 @@ def test_sphere_min():
 
     points_actor = vtk.vtkActor()
     points_actor.SetMapper(mapper)
-    points_actor.GetProperty().SetPointSize(50)
+    points_actor.GetProperty().SetPointSize(1000)
     points_actor.GetProperty().SetRenderPointsAsSpheres(True)
 
     mapper.AddShaderReplacement(
@@ -1009,7 +1010,7 @@ def test_sphere_min():
         True,
         '''
         //VTK::Light::Dec
-        uniform float radius;
+        uniform float time;
         ''',
         False
     )
@@ -1022,12 +1023,14 @@ def test_sphere_min():
         program = calldata
         if program is not None:
             try:
-                program.SetUniformf("radius", .01 * next(counter))
+                program.SetUniformf("time", next(counter))
             except ValueError:
                 pass
 
     mapper.AddObserver(window.vtk.vtkCommand.UpdateShaderEvent, vtk_shader_callback)
 
+    # TODO: Create different dots with different fragment/color
+    """
     mapper.AddShaderReplacement(
         vtk.vtkShader.Fragment,
         '//VTK::Light::Impl',
@@ -1040,6 +1043,36 @@ def test_sphere_min():
         float sf = pow(df, 24.);
         
         fragOutput0 = vec4(max(df*color, sf*vec3(1.)), 1.);
+        ''',
+        False
+    )
+    """
+
+    # TODO: Create Fragment Shader Canvas
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Fragment,
+        '//VTK::Light::Impl',
+        True,
+        '''
+        //VTK::Light::Impl
+        vec3 rColor = vec3(.9, .0, .3);
+        vec3 gColor = vec3(.0, .9, .3);
+        vec3 bColor = vec3(.0, .3, .9);
+        vec3 yColor = vec3(.9, .9, .3);
+        
+        float a = sin(normalVCVSOutput.y * 5. - time * .2) / 2.;
+        float b = cos(normalVCVSOutput.y * 5. - time * .2) / 2.;
+        float c = sin(normalVCVSOutput.y * 5. - time * .2 + 3.14) / 2.;
+        float d = cos(normalVCVSOutput.y * 5. - time * .2 + 3.14) / 2.;
+        
+        float e = .01 / abs(normalVCVSOutput.x + a);
+        float f = .01 / abs(normalVCVSOutput.x + b);
+        float g = .01 / abs(normalVCVSOutput.x + c);
+        float h = .01 / abs(normalVCVSOutput.x + d);
+        
+        vec3 destColor = rColor * e + gColor * f + bColor * g + yColor * h;
+
+        fragOutput0 = vec4(destColor, 1.);
         ''',
         False
     )
