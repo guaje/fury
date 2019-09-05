@@ -2015,6 +2015,26 @@ def grid(actors, captions=None, caption_offset=(0, -100, 0), cell_padding=0,
     return grid
 
 
-def sphere_min(centers, colors, radii=1., theta=16, phi=16, vertices=None, faces=None):
-    dots_actor = dots(centers, colors[:3], colors[3], radii)
+def sphere_min(centers, colors, radii=1.):
+    # TODO: Create an actor per color. Use uniform to pass the color.
+
+    vtk_points = numpy_to_vtk_points(centers)
+
+    points_polydata = vtk.vtkPolyData()
+    points_polydata.SetPoints(vtk_points)
+
+    vertex_filter = vtk.vtkVertexGlyphFilter()
+    vertex_filter.SetInputData(points_polydata)
+    vertex_filter.Update()
+
+    polydata = vtk.vtkPolyData()
+    polydata.ShallowCopy(vertex_filter.GetOutput())
+
+    mapper = vtk.vtkPolyDataMapper()
+    mapper.SetInputData(polydata)
+
+    points_actor = vtk.vtkActor()
+    points_actor.SetMapper(mapper)
+    points_actor.GetProperty().SetPointSize(1000)
+    points_actor.GetProperty().SetRenderPointsAsSpheres(True)
     return dots_actor
