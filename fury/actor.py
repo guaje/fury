@@ -2015,16 +2015,17 @@ def grid(actors, captions=None, caption_offset=(0, -100, 0), cell_padding=0,
     return grid
 
 
-def sphere_min(centers, colors, radii=1.):
-    # TODO: Create an actor per color. Use uniform to pass the color.
+def new_sphere(centers, colors, radius=100):
+    if np.array(colors).ndim == 1:
+        colors = np.tile(colors, (len(centers), 1))
 
-    vtk_points = numpy_to_vtk_points(centers)
+    vtk_pnt = numpy_to_vtk_points(centers)
 
-    points_polydata = vtk.vtkPolyData()
-    points_polydata.SetPoints(vtk_points)
+    pnt_polydata = vtk.vtkPolyData()
+    pnt_polydata.SetPoints(vtk_pnt)
 
     vertex_filter = vtk.vtkVertexGlyphFilter()
-    vertex_filter.SetInputData(points_polydata)
+    vertex_filter.SetInputData(pnt_polydata)
     vertex_filter.Update()
 
     polydata = vtk.vtkPolyData()
@@ -2033,8 +2034,63 @@ def sphere_min(centers, colors, radii=1.):
     mapper = vtk.vtkPolyDataMapper()
     mapper.SetInputData(polydata)
 
-    points_actor = vtk.vtkActor()
-    points_actor.SetMapper(mapper)
-    points_actor.GetProperty().SetPointSize(1000)
-    points_actor.GetProperty().SetRenderPointsAsSpheres(True)
-    return dots_actor
+    pnt_actor = vtk.vtkActor()
+    pnt_actor.SetMapper(mapper)
+
+    pnt_actor.GetProperty().SetPointSize(radius)
+    pnt_actor.GetProperty().SetRenderPointsAsSpheres(True)
+
+    colors_vtk = numpy_to_vtk_colors(colors)
+    colors_vtk.SetName('colors_vtk')
+    polydata.GetPointData().AddArray(colors_vtk)
+    mapper.MapDataArrayToVertexAttribute('color', 'colors_vtk', vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, -1)
+
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Vertex,
+        '//VTK::ValuePass::Dec',
+        True,
+        '''
+        //VTK::ValuePass::Dec
+        in vec3 color;
+        out vec3 colorVSOutput;
+        ''',
+        False
+    )
+
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Vertex,
+        '//VTK::ValuePass::Impl',
+        True,
+        '''
+        //VTK::ValuePass::Impl
+        colorVSOutput = color;
+        ''',
+        False
+    )
+
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Fragment,
+        '//VTK::Light::Dec',
+        True,
+        '''
+        //VTK::Light::Dec
+        in vec3 colorVSOutput;
+        ''',
+        False
+    )
+
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Fragment,
+        '//VTK::Light::Impl',
+        True,
+        '''
+        vec3 direction = normalize(vec3(1.));
+        
+        float df = max(0, dot(direction, normalVCVSOutput));
+        float sf = pow(df, 24.);
+        
+        fragOutput0 = vec4(max(df * colorVSOutput, sf * vec3(1.)), 1.);
+        ''',
+        False
+    )
+    return pnt_actor

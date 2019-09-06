@@ -974,7 +974,19 @@ def test_grid(_interactive=False):
     npt.assert_equal(report.objects > 6, True)
 
 
-def test_sphere_min():
+def test_new_sphere():
+    np.random.seed(42)
+    n_points = 10
+    centers = np.random.rand(n_points, 3)
+    colors = 2 * np.random.rand(n_points, 3)
+    dots_actors = actor.new_sphere(centers, colors)
+    scene = window.Scene()
+    scene.add(dots_actors)
+    scene.background((1, 1, 1))
+    window.show(scene, order_transparent=True)
+
+
+def test_shaders_canvas():
     from fury.utils import numpy_to_vtk_points, set_polydata_colors
     import vtk
     np.random.seed(42)
