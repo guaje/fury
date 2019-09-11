@@ -976,9 +976,12 @@ def test_grid(_interactive=False):
 
 def test_new_sphere():
     np.random.seed(42)
-    n_points = 10
+    colors = np.array([
+        [.85, .07, .21], [.56, .14, .85], [.16, .65, .20], [.95, .73, .06], [.95, .55, .05],
+        [.62, .42, .75], [.26, .58, .85], [.24, .82, .95], [.95, .78, .25], [.85, .58, .35]])
+    colors *= 3
+    n_points = len(colors)
     centers = np.random.rand(n_points, 3)
-    colors = 2 * np.random.rand(n_points, 3)
     dots_actors = actor.new_sphere(centers, colors)
     scene = window.Scene()
     scene.add(dots_actors)
