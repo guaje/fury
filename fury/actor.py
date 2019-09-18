@@ -2033,17 +2033,19 @@ def new_sphere(centers, colors, radius=100):
 
     mapper = vtk.vtkPolyDataMapper()
     mapper.SetInputData(polydata)
+    mapper.SetScalarModeToUsePointFieldData()
 
     pnt_actor = vtk.vtkActor()
     pnt_actor.SetMapper(mapper)
 
     pnt_actor.GetProperty().SetPointSize(radius)
-    pnt_actor.GetProperty().SetRenderPointsAsSpheres(True)
+    #pnt_actor.GetProperty().SetRenderPointsAsSpheres(True)
 
-    colors_vtk = numpy_to_vtk_colors(colors)
-    colors_vtk.SetName('colors_vtk')
-    polydata.GetPointData().AddArray(colors_vtk)
-    mapper.MapDataArrayToVertexAttribute('color', 'colors_vtk', vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, -1)
+    cols = numpy_to_vtk_colors(255 * np.ascontiguousarray(colors))
+    cols.SetName('colors')
+    polydata.GetPointData().AddArray(cols)
+    #mapper.MapDataArrayToVertexAttribute('color', 'colors_vtk', vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, -1)
+    mapper.SelectColorArray('colors')
 
     mapper.AddShaderReplacement(
         vtk.vtkShader.Vertex,
@@ -2051,8 +2053,7 @@ def new_sphere(centers, colors, radius=100):
         True,
         '''
         //VTK::ValuePass::Dec
-        in vec3 color;
-        out vec3 colorVSOutput;
+        out vec4 myVertexMC;
         ''',
         False
     )
@@ -2063,7 +2064,7 @@ def new_sphere(centers, colors, radius=100):
         True,
         '''
         //VTK::ValuePass::Impl
-        colorVSOutput = color;
+        myVertexMC = vertexMC;
         ''',
         False
     )
@@ -2074,7 +2075,13 @@ def new_sphere(centers, colors, radius=100):
         True,
         '''
         //VTK::Light::Dec
-        in vec3 colorVSOutput;
+        varying vec4 myVertexMC;
+        
+        float circle(vec2 uv, vec2 p, float r, float blur) {
+            float d = length(uv - p);
+            float c = smoothstep(r, r - blur, d);
+            return c;
+        }
         ''',
         False
     )
@@ -2084,12 +2091,66 @@ def new_sphere(centers, colors, radius=100):
         '//VTK::Light::Impl',
         True,
         '''
+        vec3 color = ambientColor + diffuseColor;
+        
+        float xpos = 2 * gl_PointCoord.x - 1;
+        float ypos = 1 - 2 * gl_PointCoord.y;
+        
+        // VTK Fake Spheres
+        float len2 = xpos * xpos + ypos * ypos;
+        if(len2 > 1.0) {
+            discard;
+        }
+        
+        vec3 normalVCVSOutput = normalize(
+            vec3(xpos, ypos, sqrt(1. - len2))
+        );
+        /*
+        gl_FragDepth = gl_FragCoord.z + normalVCVSOutput.z * ZCalcS * ZCalcR;
+        if(cameraParallel == 0) {
+            float ZCalcQ = (normalVCVSOutput.z * ZCalcR - 1.0);
+            gl_FragDepth = (ZCalcS - gl_FragCoord.z) / ZCalcQ + ZCalcS;
+        }
+        */
+        
         vec3 direction = normalize(vec3(1.));
         
         float df = max(0, dot(direction, normalVCVSOutput));
-        float sf = pow(df, 24.);
+        float sf = pow(df, 24); 
         
-        fragOutput0 = vec4(max(df * colorVSOutput, sf * vec3(1.)), 1.);
+        //fragOutput0 = vec4(myVertexMC.xyz, 1);
+        //fragOutput0 = vec4(gl_PointCoord, 0, 1);
+        //fragOutput0 = vec4(xpos, ypos, 0, 1);
+        //fragOutput0 = vec4(gl_FragCoord.xyz * .001, 1);
+        //fragOutput0 = vec4(myGLPosition.xyz, 1.);
+        //fragOutput0 = vec4(max(df * color, sf * vec3(1)), 1);
+        
+        //vec2 p = gl_PointCoord;
+        vec2 p = vec2(xpos, ypos);
+        
+        float face = circle(p, vec2(0), 1, .05);
+        face -= circle(p, vec2(-.35, .3), .2, .01);
+        face -= circle(p, vec2(.35, .3), .2, .01);
+        face -= circle(p, vec2(0.0, 0.0), .1, .01);
+        
+        float mouth = circle(p, vec2(0., 0.), .9, .02);
+        mouth -= circle(p, vec2(0, .16), .9, .02);
+        
+        face -= mouth;
+        
+        fragOutput0 = vec4(color * face, 1);
+        
+        /*
+        if(length(p) < 1) {
+            //fragOutput0 = vec4(vertexColor, 1);
+            //fragOutput0 = vec4(color, opacity);
+            fragOutput0 = vec4(max(df * color, sf * vec3(1)), 1);
+        } else {
+            //fragOutput0.a = 0;
+            //fragOutput0 = vec4(1, 1, 1, 1);
+            discard;
+        }
+        */
         ''',
         False
     )
