@@ -978,17 +978,16 @@ def test_new_sphere():
     np.random.seed(42)
     colors = np.array([
         [.85, .07, .21], [.56, .14, .85], [.16, .65, .20], [.95, .73, .06], [.95, .55, .05],
-        #[.62, .42, .75], [.26, .58, .85], [.24, .82, .95], [.95, .78, .25], [.85, .58, .35],
+        [.62, .42, .75], [.26, .58, .85], [.24, .82, .95], [.95, .78, .25], [.85, .58, .35],
         [1., 1., 1.]
     ])
-    #colors *= 2
     n_points = len(colors)
     centers = np.random.rand(n_points, 3)
     dots_actors = actor.new_sphere(centers, colors)
     scene = window.Scene()
     scene.add(actor.axes())
     scene.add(dots_actors)
-    #scene.background((1, 1, 1))
+    scene.background((1, 1, 1))
     window.show(scene, order_transparent=True)
 
 

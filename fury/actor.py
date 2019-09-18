@@ -2082,6 +2082,19 @@ def new_sphere(centers, colors, radius=100):
             float c = smoothstep(r, r - blur, d);
             return c;
         }
+        
+        float ourSmileyFace(vec2 p) {
+            float face = circle(p, vec2(0), 1, .05);
+            face -= circle(p, vec2(-.35, .3), .2, .01);
+            face -= circle(p, vec2(.35, .3), .2, .01);
+            face -= circle(p, vec2(0.0, 0.0), .1, .01);
+            
+            float mouth = circle(p, vec2(0., 0.), .9, .02);
+            mouth -= circle(p, vec2(0, .16), .9, .02);
+            
+            face -= mouth;
+            return face;
+        }
         ''',
         False
     )
@@ -2091,20 +2104,21 @@ def new_sphere(centers, colors, radius=100):
         '//VTK::Light::Impl',
         True,
         '''
-        vec3 color = ambientColor + diffuseColor;
+        vec3 color = vertexColorVSOutput.rgb;
+        
+        //vec2 p = gl_PointCoord;
         
         float xpos = 2 * gl_PointCoord.x - 1;
         float ypos = 1 - 2 * gl_PointCoord.y;
+        vec2 p = vec2(xpos, ypos);
         
         // VTK Fake Spheres
-        float len2 = xpos * xpos + ypos * ypos;
-        if(len2 > 1.0) {
+        float p_len = length(p);
+        if(p_len > 1) {
             discard;
         }
         
-        vec3 normalVCVSOutput = normalize(
-            vec3(xpos, ypos, sqrt(1. - len2))
-        );
+        vec3 normalVCVSOutput = normalize(vec3(xpos, ypos, sqrt(1. - p_len)));
         /*
         gl_FragDepth = gl_FragCoord.z + normalVCVSOutput.z * ZCalcS * ZCalcR;
         if(cameraParallel == 0) {
@@ -2113,43 +2127,22 @@ def new_sphere(centers, colors, radius=100):
         }
         */
         
-        vec3 direction = normalize(vec3(1.));
+        vec3 direction = normalize(vec3(1., 1., 1.));
         
         float df = max(0, dot(direction, normalVCVSOutput));
-        float sf = pow(df, 24); 
+        float sf = pow(df, 24);
         
         //fragOutput0 = vec4(myVertexMC.xyz, 1);
         //fragOutput0 = vec4(gl_PointCoord, 0, 1);
         //fragOutput0 = vec4(xpos, ypos, 0, 1);
         //fragOutput0 = vec4(gl_FragCoord.xyz * .001, 1);
-        //fragOutput0 = vec4(myGLPosition.xyz, 1.);
-        //fragOutput0 = vec4(max(df * color, sf * vec3(1)), 1);
-        
-        //vec2 p = gl_PointCoord;
-        vec2 p = vec2(xpos, ypos);
-        
-        float face = circle(p, vec2(0), 1, .05);
-        face -= circle(p, vec2(-.35, .3), .2, .01);
-        face -= circle(p, vec2(.35, .3), .2, .01);
-        face -= circle(p, vec2(0.0, 0.0), .1, .01);
-        
-        float mouth = circle(p, vec2(0., 0.), .9, .02);
-        mouth -= circle(p, vec2(0, .16), .9, .02);
-        
-        face -= mouth;
-        
-        fragOutput0 = vec4(color * face, 1);
+        //fragOutput0 = vec4(color, 1);
+        fragOutput0 = vec4(max(df * color, sf * vec3(1)), 1);
         
         /*
-        if(length(p) < 1) {
-            //fragOutput0 = vec4(vertexColor, 1);
-            //fragOutput0 = vec4(color, opacity);
-            fragOutput0 = vec4(max(df * color, sf * vec3(1)), 1);
-        } else {
-            //fragOutput0.a = 0;
-            //fragOutput0 = vec4(1, 1, 1, 1);
-            discard;
-        }
+        // Smiley faces example 
+        float face = ourSmileyFace(p);        
+        fragOutput0 = vec4(color * face, 1);
         */
         ''',
         False
