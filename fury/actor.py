@@ -2048,65 +2048,11 @@ def new_sphere(centers, colors, radius=100):
     mapper.SelectColorArray('colors')
 
     mapper.AddShaderReplacement(
-        vtk.vtkShader.Vertex,
-        '//VTK::ValuePass::Dec',
-        True,
-        '''
-        //VTK::ValuePass::Dec
-        out vec4 myVertexMC;
-        ''',
-        False
-    )
-
-    mapper.AddShaderReplacement(
-        vtk.vtkShader.Vertex,
-        '//VTK::ValuePass::Impl',
-        True,
-        '''
-        //VTK::ValuePass::Impl
-        myVertexMC = vertexMC;
-        ''',
-        False
-    )
-
-    mapper.AddShaderReplacement(
-        vtk.vtkShader.Fragment,
-        '//VTK::Light::Dec',
-        True,
-        '''
-        //VTK::Light::Dec
-        varying vec4 myVertexMC;
-        
-        float circle(vec2 uv, vec2 p, float r, float blur) {
-            float d = length(uv - p);
-            float c = smoothstep(r, r - blur, d);
-            return c;
-        }
-        
-        float ourSmileyFace(vec2 p) {
-            float face = circle(p, vec2(0), 1, .05);
-            face -= circle(p, vec2(-.35, .3), .2, .01);
-            face -= circle(p, vec2(.35, .3), .2, .01);
-            face -= circle(p, vec2(0.0, 0.0), .1, .01);
-            
-            float mouth = circle(p, vec2(0., 0.), .9, .02);
-            mouth -= circle(p, vec2(0, .16), .9, .02);
-            
-            face -= mouth;
-            return face;
-        }
-        ''',
-        False
-    )
-
-    mapper.AddShaderReplacement(
         vtk.vtkShader.Fragment,
         '//VTK::Light::Impl',
         True,
         '''
         vec3 color = vertexColorVSOutput.rgb;
-        
-        //vec2 p = gl_PointCoord;
         
         float xpos = 2 * gl_PointCoord.x - 1;
         float ypos = 1 - 2 * gl_PointCoord.y;
@@ -2132,18 +2078,7 @@ def new_sphere(centers, colors, radius=100):
         float df = max(0, dot(direction, normalVCVSOutput));
         float sf = pow(df, 24);
         
-        //fragOutput0 = vec4(myVertexMC.xyz, 1);
-        //fragOutput0 = vec4(gl_PointCoord, 0, 1);
-        //fragOutput0 = vec4(xpos, ypos, 0, 1);
-        //fragOutput0 = vec4(gl_FragCoord.xyz * .001, 1);
-        //fragOutput0 = vec4(color, 1);
         fragOutput0 = vec4(max(df * color, sf * vec3(1)), 1);
-        
-        /*
-        // Smiley faces example 
-        float face = ourSmileyFace(p);        
-        fragOutput0 = vec4(color * face, 1);
-        */
         ''',
         False
     )
