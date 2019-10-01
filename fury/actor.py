@@ -2015,7 +2015,7 @@ def grid(actors, captions=None, caption_offset=(0, -100, 0), cell_padding=0,
     return grid
 
 
-def new_sphere(centers, colors, radius=100):
+def new_sphere(centers, colors, radius=10000, renderer=None):
     if np.array(colors).ndim == 1:
         colors = np.tile(colors, (len(centers), 1))
 
@@ -2044,14 +2044,54 @@ def new_sphere(centers, colors, radius=100):
     cols = numpy_to_vtk_colors(255 * np.ascontiguousarray(colors))
     cols.SetName('colors')
     polydata.GetPointData().AddArray(cols)
-    #mapper.MapDataArrayToVertexAttribute('color', 'colors_vtk', vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, -1)
+    #mapper.MapDataArrayToVertexAttribute(
+        #'color', 'colors_vtk', vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, -1)
     mapper.SelectColorArray('colors')
 
     mapper.AddShaderReplacement(
-        vtk.vtkShader.Fragment,
-        '//VTK::Light::Impl',
+        vtk.vtkShader.Vertex,
+        "//VTK::ValuePass::Dec",
         True,
-        '''
+        """
+        //VTK::ValuePass::Dec
+        out vec4 myVertexMC;
+        out vec4 myGLPosition;
+        """,
+        False
+    )
+
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Vertex,
+        "//VTK::ValuePass::Impl",
+        True,
+        """
+        //VTK::ValuePass::Impl
+        myVertexMC = vertexMC;
+        myGLPosition = gl_Position;
+        """,
+        False
+    )
+
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Fragment,
+        "//VTK::ValuePass::Dec",
+        True,
+        """
+        //VTK::ValuePass::Dec
+        uniform mat4 viewMat;
+        uniform mat4 projMat;
+        uniform vec3 cameraPos;
+        varying vec4 myVertexMC;
+        varying vec4 myGLPosition;
+        """,
+        False
+    )
+
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Fragment,
+        "//VTK::Light::Impl",
+        True,
+        """
         vec3 color = vertexColorVSOutput.rgb;
         
         float xpos = 2 * gl_PointCoord.x - 1;
@@ -2064,9 +2104,9 @@ def new_sphere(centers, colors, radius=100):
             discard;
         }
         
-        vec3 normalVCVSOutput = normalize(vec3(xpos, ypos, sqrt(1. - p_len)));
+        vec3 normalVCVSOutput = normalize(vec3(p.xy, sqrt(1. - p_len)));
         /*
-        gl_FragDepth = gl_FragCoord.z + normalVCVSOutput.z * ZCalcS * ZCalcR;
+        gl_FragDepth = gl_FragCoord.z + normalVCVSOutput1.z * ZCalcS * ZCalcR;
         if(cameraParallel == 0) {
             float ZCalcQ = (normalVCVSOutput.z * ZCalcR - 1.0);
             gl_FragDepth = (ZCalcS - gl_FragCoord.z) / ZCalcQ + ZCalcS;
@@ -2078,8 +2118,27 @@ def new_sphere(centers, colors, radius=100):
         float df = max(0, dot(direction, normalVCVSOutput));
         float sf = pow(df, 24);
         
-        fragOutput0 = vec4(max(df * color, sf * vec3(1)), 1);
-        ''',
+        //fragOutput0 = vec4(max(df * color, sf * vec3(1)), 1);
+        
+        //fragOutput0 = vec4(myVertexMC.xyz, 1);
+        fragOutput0 = vec4(cameraPos, 1);
+        """,
         False
     )
+
+    @vtk.calldata_type(vtk.VTK_OBJECT)
+    def vtkShaderCallback(caller, event, calldata=None):
+        camera = renderer.GetActiveCamera()
+        cameraPos = camera.GetPosition()
+        projMat = camera.GetProjectionTransformMatrix(renderer)
+        viewMat = camera.GetViewTransformMatrix()
+        program = calldata
+        if program is not None:
+            program.SetUniform3f("cameraPos", cameraPos)
+            program.SetUniformMatrix("projMat", projMat)
+            program.SetUniformMatrix("viewMat", viewMat)
+
+    mapper.AddObserver(vtk.vtkCommand.UpdateShaderEvent,
+                            vtkShaderCallback)
+
     return pnt_actor
