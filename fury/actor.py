@@ -2015,7 +2015,7 @@ def grid(actors, captions=None, caption_offset=(0, -100, 0), cell_padding=0,
     return grid
 
 
-def new_sphere(centers, colors, radius=10000, renderer=None):
+def new_sphere(centers, colors, radius=100, renderer=None):
     if np.array(colors).ndim == 1:
         colors = np.tile(colors, (len(centers), 1))
 
@@ -2118,10 +2118,10 @@ def new_sphere(centers, colors, radius=10000, renderer=None):
         float df = max(0, dot(direction, normalVCVSOutput));
         float sf = pow(df, 24);
         
-        //fragOutput0 = vec4(max(df * color, sf * vec3(1)), 1);
+        fragOutput0 = vec4(max(df * color, sf * vec3(1)), 1);
         
         //fragOutput0 = vec4(myVertexMC.xyz, 1);
-        fragOutput0 = vec4(cameraPos, 1);
+        //fragOutput0 = vec4(cameraPos, 1);
         """,
         False
     )
