@@ -2118,6 +2118,7 @@ def new_sphere(centers, colors, radius=100):
         //fragOutput0 = vec4(max(df * color, sf * vec3(1)), 1);
         
         fragOutput0 = vec4(myGLPosition.z, 0, 0, 1);
+        //fragOutput0 = vec4(gl_FragCoord.z, 0, 0, 1);
         """,
         False
     )
