@@ -2015,7 +2015,7 @@ def grid(actors, captions=None, caption_offset=(0, -100, 0), cell_padding=0,
     return grid
 
 
-def new_sphere(centers, colors, radius=100, renderer=None):
+def new_sphere(centers, colors, radius=100):
     if np.array(colors).ndim == 1:
         colors = np.tile(colors, (len(centers), 1))
 
@@ -2078,9 +2078,6 @@ def new_sphere(centers, colors, radius=100, renderer=None):
         True,
         """
         //VTK::ValuePass::Dec
-        uniform mat4 viewMat;
-        uniform mat4 projMat;
-        uniform vec3 cameraPos;
         varying vec4 myVertexMC;
         varying vec4 myGLPosition;
         """,
@@ -2118,14 +2115,14 @@ def new_sphere(centers, colors, radius=100, renderer=None):
         float df = max(0, dot(direction, normalVCVSOutput));
         float sf = pow(df, 24);
         
-        fragOutput0 = vec4(max(df * color, sf * vec3(1)), 1);
+        //fragOutput0 = vec4(max(df * color, sf * vec3(1)), 1);
         
-        //fragOutput0 = vec4(myVertexMC.xyz, 1);
-        //fragOutput0 = vec4(cameraPos, 1);
+        fragOutput0 = vec4(myGLPosition.z, 0, 0, 1);
         """,
         False
     )
 
+    """
     @vtk.calldata_type(vtk.VTK_OBJECT)
     def vtkShaderCallback(caller, event, calldata=None):
         camera = renderer.GetActiveCamera()
@@ -2140,5 +2137,6 @@ def new_sphere(centers, colors, radius=100, renderer=None):
 
     mapper.AddObserver(vtk.vtkCommand.UpdateShaderEvent,
                             vtkShaderCallback)
+    """
 
     return pnt_actor
