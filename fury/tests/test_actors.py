@@ -983,13 +983,19 @@ def test_new_sphere():
     ])
     n_points = len(colors)
     centers = np.random.rand(n_points, 3)
+    print(centers)
 
     scene = window.Scene()
-    dots_actors = actor.new_sphere(centers, colors)
+    print(scene.camera_info())
+    print(np.sqrt(np.sum((centers - scene.GetActiveCamera().GetPosition()) ** 2, axis=1)))
+
+    dots_actors = actor.new_sphere(centers, colors, scene)
     scene.add(actor.axes())
+    scene.add(actor.sphere(np.zeros((1, 3)), np.zeros((1, 3)), radii=.1))
     scene.add(dots_actors)
     scene.background((1, 1, 1))
-    window.show(scene, order_transparent=True, reset_camera=False)
+
+    window.show(scene, order_transparent=True)
 
 
 if __name__ == "__main__":

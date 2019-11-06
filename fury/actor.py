@@ -2015,7 +2015,7 @@ def grid(actors, captions=None, caption_offset=(0, -100, 0), cell_padding=0,
     return grid
 
 
-def new_sphere(centers, colors, radius=100):
+def new_sphere(centers, colors, scene, radius=100):
     if np.array(colors).ndim == 1:
         colors = np.tile(colors, (len(centers), 1))
 
@@ -2054,8 +2054,11 @@ def new_sphere(centers, colors, radius=100):
         True,
         """
         //VTK::ValuePass::Dec
-        out vec4 myVertexMC;
-        out vec4 myGLPosition;
+        uniform vec3 Ext_camPos;
+        
+        out vec4 VSOut_vertexMC;
+        out vec4 VSOut_gl_Position;
+        out float VSOut_distCam;
         """,
         False
     )
@@ -2066,8 +2069,9 @@ def new_sphere(centers, colors, radius=100):
         True,
         """
         //VTK::ValuePass::Impl
-        myVertexMC = vertexMC;
-        myGLPosition = gl_Position;
+        VSOut_vertexMC = vertexMC;
+        VSOut_gl_Position = gl_Position;
+        VSOut_distCam = length(vertexMC.xyz - Ext_camPos);
         """,
         False
     )
@@ -2078,8 +2082,14 @@ def new_sphere(centers, colors, radius=100):
         True,
         """
         //VTK::ValuePass::Dec
-        varying vec4 myVertexMC;
-        varying vec4 myGLPosition;
+        in vec4 VSOut_vertexMC;
+        in vec4 VSOut_gl_Position;
+        in float VSOut_distCam;
+        
+        uniform vec2 Ext_res;
+        uniform vec3 Ext_camPos;
+        uniform mat3 Ext_projectionMatrix;
+        uniform mat3 Ext_viewMatrix;
         """,
         False
     )
@@ -2095,49 +2105,46 @@ def new_sphere(centers, colors, radius=100):
         float ypos = 1 - 2 * gl_PointCoord.y;
         vec2 p = vec2(xpos, ypos);
         
+        float radius = 1 / VSOut_distCam;
+        
         // VTK Fake Spheres
         float p_len = length(p);
-        if(p_len > 1) {
+        if(p_len > radius)
             discard;
-        }
         
         vec3 normalVCVSOutput = normalize(vec3(p.xy, sqrt(1. - p_len)));
-        /*
-        gl_FragDepth = gl_FragCoord.z + normalVCVSOutput1.z * ZCalcS * ZCalcR;
-        if(cameraParallel == 0) {
-            float ZCalcQ = (normalVCVSOutput.z * ZCalcR - 1.0);
-            gl_FragDepth = (ZCalcS - gl_FragCoord.z) / ZCalcQ + ZCalcS;
-        }
-        */
         
-        vec3 direction = normalize(vec3(1., 1., 1.));
+        vec3 direction = normalize(vec3(1, 1, 1));
         
         float df = max(0, dot(direction, normalVCVSOutput));
         float sf = pow(df, 24);
         
-        //fragOutput0 = vec4(max(df * color, sf * vec3(1)), 1);
-        
-        fragOutput0 = vec4(myGLPosition.z, 0, 0, 1);
-        //fragOutput0 = vec4(gl_FragCoord.z, 0, 0, 1);
+        fragOutput0 = vec4(max(df * color, sf * vec3(1)), 1);
+        /*
+        if(VSOut_distCam < 1)
+            fragOutput0 = vec4(1, 0, 0, 1);
+        else
+            fragOutput0 = vec4(0, 1, 0, 1);
+        */
         """,
         False
     )
 
-    """
     @vtk.calldata_type(vtk.VTK_OBJECT)
-    def vtkShaderCallback(caller, event, calldata=None):
-        camera = renderer.GetActiveCamera()
-        cameraPos = camera.GetPosition()
-        projMat = camera.GetProjectionTransformMatrix(renderer)
-        viewMat = camera.GetViewTransformMatrix()
+    def vtk_shader_callback(caller, event, calldata=None):
+        res = scene.size()
+        camera = scene.GetActiveCamera()
+        cam_pos = camera.GetPosition()
+        proj_mat = camera.GetProjectionTransformMatrix(scene)
+        view_mat = camera.GetViewTransformMatrix()
         program = calldata
         if program is not None:
-            program.SetUniform3f("cameraPos", cameraPos)
-            program.SetUniformMatrix("projMat", projMat)
-            program.SetUniformMatrix("viewMat", viewMat)
+            program.SetUniform2f("Ext_res", res)
+            program.SetUniform3f("Ext_camPos", cam_pos)
+            #print(cam_pos)
+            program.SetUniformMatrix("Ext_projectionMatrix", proj_mat)
+            program.SetUniformMatrix("Ext_viewMatrix", view_mat)
 
-    mapper.AddObserver(vtk.vtkCommand.UpdateShaderEvent,
-                            vtkShaderCallback)
-    """
+    mapper.AddObserver(vtk.vtkCommand.UpdateShaderEvent, vtk_shader_callback)
 
     return pnt_actor
