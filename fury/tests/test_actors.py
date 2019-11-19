@@ -1073,5 +1073,399 @@ def test_grid(_interactive=False):
     npt.assert_equal(report.objects > 6, True)
 
 
+def test_sphere_on_canvas():
+    from fury.utils import get_actor_from_polydata, set_polydata_triangles, \
+        set_polydata_vertices, set_polydata_colors
+    from vtk.util.numpy_support import numpy_to_vtk
+    import vtk
+
+    colors = 255 * np.array([
+        [.85, .07, .21], [.56, .14, .85], [.16, .65, .20], [.95, .73, .06],
+        [.95, .55, .05], [.62, .42, .75], [.26, .58, .85], [.24, .82, .95],
+        [.95, .78, .25], [.85, .58, .35], [1., 1., 1.]
+    ])
+    n_points = colors.shape[0]
+    np.random.seed(42)
+    centers = 5 * np.random.rand(n_points, 3)
+    radius = np.random.rand(n_points)
+
+    polydata = vtk.vtkPolyData()
+
+    verts = np.array([[0.0, 0.0, 0.0],
+                      [0.0, 1.0, 0.0],
+                      [1.0, 1.0, 0.0],
+                      [1.0, 0.0, 0.0]])
+    verts -= np.array([0.5, 0.5, 0])
+
+    big_verts = np.tile(verts, (centers.shape[0], 1))
+    big_cents = np.repeat(centers, verts.shape[0], axis=0)
+
+    big_verts += big_cents
+
+    #print(big_verts)
+
+    big_scales = np.repeat(radius, verts.shape[0], axis=0)
+
+    #print(big_scales)
+
+    big_verts *= big_scales[:, np.newaxis]
+
+    #print(big_verts)
+
+    tris = np.array([[0, 1, 2], [2, 3, 0]], dtype='i8')
+
+    big_tris = np.tile(tris, (centers.shape[0], 1))
+    shifts = np.repeat(np.arange(0, centers.shape[0] * verts.shape[0],
+                                 verts.shape[0]), tris.shape[0])
+
+    big_tris += shifts[:, np.newaxis]
+
+    #print(big_tris)
+
+    big_cols = np.repeat(colors, verts.shape[0], axis=0)
+
+    #print(big_cols)
+
+    big_centers = np.repeat(centers, verts.shape[0], axis=0)
+
+    #print(big_centers)
+
+    big_centers *= big_scales[:, np.newaxis]
+
+    #print(big_centers)
+
+    set_polydata_vertices(polydata, big_verts)
+    set_polydata_triangles(polydata, big_tris)
+    set_polydata_colors(polydata, big_cols)
+
+    vtk_centers = numpy_to_vtk(big_centers, deep=True)
+    vtk_centers.SetNumberOfComponents(3)
+    vtk_centers.SetName("center")
+    polydata.GetPointData().AddArray(vtk_centers)
+
+    canvas_actor = get_actor_from_polydata(polydata)
+    canvas_actor.GetProperty().BackfaceCullingOff()
+
+    scene = window.Scene()
+
+    mapper = canvas_actor.GetMapper()
+
+    mapper.MapDataArrayToVertexAttribute(
+        "center", "center", vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, -1)
+
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Vertex,
+        "//VTK::ValuePass::Dec",
+        True,
+        """
+        //VTK::ValuePass::Dec
+        in vec3 center;
+        out vec3 centeredVertexMC;
+        out vec3 cameraPosition;
+        out vec3 same;
+        """,
+        False
+    )
+
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Vertex,
+        "//VTK::ValuePass::Impl",
+        True,
+        """
+        //VTK::ValuePass::Impl
+        centeredVertexMC = vertexMC.xyz - center;
+        float scalingFactor = 1. / abs(centeredVertexMC.x);
+        centeredVertexMC *= scalingFactor;
+        
+        cameraPosition = -MCVCMatrix[3].xyz * mat3(MCVCMatrix);
+        same = -MCVCMatrix[0].xyz * mat3(MCVCMatrix);
+        
+        mat4 modelView = MCVCMatrix;
+        //modelView[0][0] = 1.;
+        modelView[0][1] = 0.;
+        modelView[0][2] = 0.;
+        modelView[1][0] = 0.;
+        //modelView[1][1] = 1.;
+        modelView[1][2] = 0.;
+        modelView[2][0] = 0.;
+        modelView[2][1] = 0.;
+        //modelView[2][2] = 1.;
+        //vertexVCVSOutput = modelView * vertexMC;
+        
+        mat4 modelDevice = MCDCMatrix;
+        //modelDevice[0][0] = 1.;
+        modelDevice[0][1] = 0.;
+        modelDevice[0][2] = 0.;
+        modelDevice[1][0] = 0.;
+        //modelDevice[1][1] = 1.;
+        modelDevice[1][2] = 0.;
+        modelDevice[2][0] = 0.;
+        modelDevice[2][1] = 0.;
+        //modelDevice[2][2] = 1.;
+        //gl_Position = modelDevice * vertexMC;
+        
+        //error
+        """,
+        False
+    )
+
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Fragment,
+        "//VTK::ValuePass::Dec",
+        True,
+        """
+        //VTK::ValuePass::Dec
+        in vec3 centeredVertexMC;
+        in vec3 cameraPosition;
+        in vec3 same;
+        
+        uniform vec3 Ext_camPos;
+        uniform vec3 Ext_focPnt;
+        """,
+        False
+    )
+
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Fragment,
+        "//VTK::Light::Impl",
+        True,
+        """
+        // Renaming variables passed from the Vertex Shader
+        vec3 color = vertexColorVSOutput.rgb;
+        vec3 point = centeredVertexMC;
+        float p = length(same - Ext_focPnt);
+        if(p < .5)
+            fragOutput0 = vec4(1, 0, 0, 1);
+        else
+            fragOutput0 = vec4(0, 1, 0, 1);
+        /*
+        float len = length(point);
+        // VTK Fake Spheres
+        float radius = 1.;
+        if(len > radius)
+          discard;
+        vec3 normalizedPoint = normalize(vec3(point.xy, sqrt(1. - len)));
+        vec3 direction = normalize(vec3(1., 1., 1.));
+        float df = max(0, dot(direction, normalizedPoint));
+        float sf = pow(df, 24);
+        fragOutput0 = vec4(max(df * color, sf * vec3(1)), 1);
+        */
+        """,
+        False
+    )
+
+    @vtk.calldata_type(vtk.VTK_OBJECT)
+    def vtk_shader_callback(caller, event, calldata=None):
+        res = scene.size()
+        camera = scene.GetActiveCamera()
+        cam_pos = camera.GetPosition()
+        foc_pnt = camera.GetFocalPoint()
+        proj_mat = camera.GetProjectionTransformMatrix(scene)
+        view_mat = camera.GetViewTransformMatrix()
+        program = calldata
+        if program is not None:
+            program.SetUniform2f("Ext_res", res)
+            program.SetUniform3f("Ext_camPos", cam_pos)
+            program.SetUniform3f("Ext_focPnt", foc_pnt)
+            print(foc_pnt)
+            program.SetUniformMatrix("Ext_projectionMatrix", proj_mat)
+            print(proj_mat)
+            program.SetUniformMatrix("Ext_viewMatrix", view_mat)
+            print(proj_mat)
+
+    mapper.AddObserver(vtk.vtkCommand.UpdateShaderEvent, vtk_shader_callback)
+
+    label = vtk.vtkOpenGLBillboardTextActor3D()
+    label.SetInput("FURY Rocks!!!")
+    label.SetPosition(1., 1., 1)
+    label.GetTextProperty().SetFontSize(40)
+    label.GetTextProperty().SetColor(.5, .5, .5)
+    # TODO: Get Billboard's mapper
+
+    # TODO: Write issue
+    # TODO: Add callback
+
+    #scene.add(label)
+    scene.add(actor.axes())
+    scene.add(canvas_actor)
+    scene.background((1, 1, 1))
+
+    #scene.set_camera(position=(20, 0, 50))
+    window.show(scene, reset_camera=True)
+
+
+def test_fireballs_on_canvas():
+    from fury.utils import get_actor_from_polydata, set_polydata_triangles, \
+        set_polydata_vertices, set_polydata_colors
+    from vtk.util.numpy_support import numpy_to_vtk
+    import vtk
+
+    scene = window.Scene()
+    showm = window.ShowManager(scene)
+
+    colors = 255 * np.array([
+        [.85, .07, .21], [.56, .14, .85], [.16, .65, .20], [.95, .73, .06],
+        [.95, .55, .05], [.62, .42, .75], [.26, .58, .85], [.24, .82, .95],
+        [.95, .78, .25], [.85, .58, .35], [1., 1., 1.]
+    ])
+    n_points = colors.shape[0]
+    np.random.seed(42)
+    centers = 5 * np.random.rand(n_points, 3)
+
+    radius = .5 * np.ones(n_points)
+
+    polydata = vtk.vtkPolyData()
+
+    verts = np.array([[0.0, 0.0, 0.0],
+                      [0.0, 1.0, 0.0],
+                      [1.0, 1.0, 0.0],
+                      [1.0, 0.0, 0.0]])
+    verts -= np.array([0.5, 0.5, 0])
+
+    big_verts = np.tile(verts, (centers.shape[0], 1))
+    big_cents = np.repeat(centers, verts.shape[0], axis=0)
+
+    big_verts += big_cents
+
+    big_scales = np.repeat(radius, verts.shape[0], axis=0)
+
+    big_verts *= big_scales[:, np.newaxis]
+
+    tris = np.array([[0, 1, 2], [2, 3, 0]], dtype='i8')
+
+    big_tris = np.tile(tris, (centers.shape[0], 1))
+    shifts = np.repeat(np.arange(0, centers.shape[0] * verts.shape[0],
+                                 verts.shape[0]), tris.shape[0])
+
+    big_tris += shifts[:, np.newaxis]
+
+    big_cols = np.repeat(colors, verts.shape[0], axis=0)
+
+    big_centers = np.repeat(centers, verts.shape[0], axis=0)
+
+    big_centers *= big_scales[:, np.newaxis]
+
+    set_polydata_vertices(polydata, big_verts)
+    set_polydata_triangles(polydata, big_tris)
+    set_polydata_colors(polydata, big_cols)
+
+    vtk_centers = numpy_to_vtk(big_centers, deep=True)
+    vtk_centers.SetNumberOfComponents(3)
+    vtk_centers.SetName("center")
+    polydata.GetPointData().AddArray(vtk_centers)
+
+    canvas_actor = get_actor_from_polydata(polydata)
+    canvas_actor.GetProperty().BackfaceCullingOff()
+
+    scene.add(canvas_actor)
+
+    mapper = canvas_actor.GetMapper()
+
+    mapper.MapDataArrayToVertexAttribute(
+        "center", "center", vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, -1)
+
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Vertex,
+        "//VTK::ValuePass::Dec",
+        True,
+        """
+        //VTK::ValuePass::Dec
+        in vec3 center;
+        out vec3 centeredVertexMC;
+        """,
+        False
+    )
+
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Vertex,
+        "//VTK::ValuePass::Impl",
+        True,
+        """
+        //VTK::ValuePass::Impl
+        centeredVertexMC = vertexMC.xyz - center;
+        float scalingFactor = 1. / abs(centeredVertexMC.x);
+        centeredVertexMC *= scalingFactor;
+        """,
+        False
+    )
+
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Fragment,
+        "//VTK::ValuePass::Dec",
+        True,
+        """
+        //VTK::ValuePass::Dec
+        in vec3 centeredVertexMC;
+        uniform float time;
+        
+        float snoise(vec3 uv, float res) {
+            const vec3 s = vec3(1e0, 1e2, 1e3);
+            uv *= res;
+            vec3 uv0 = floor(mod(uv, res)) * s;
+            vec3 uv1 = floor(mod(uv + vec3(1.), res)) * s;
+            vec3 f = fract(uv);
+            f = f * f * (3. - 2. * f);
+            vec4 v = vec4(uv0.x + uv0.y + uv0.z, uv1.x + uv0.y + uv0.z, 
+                uv0.x + uv1.y + uv0.z, uv1.x + uv1.y + uv0.z);
+            vec4 r = fract(sin(v * 1e-1) * 1e3);
+            float r0 = mix(mix(r.x, r.y, f.x), mix(r.z, r.w, f.x), f.y);
+            r = fract(sin((v + uv1.z - uv0.z) * 1e-1) * 1e3);
+            float r1 = mix(mix(r.x, r.y, f.x), mix(r.z, r.w, f.x), f.y);
+            return mix(r0, r1, f.z) * 2. - 1.;
+        }
+        """,
+        False
+    )
+
+    mapper.AddShaderReplacement(
+        vtk.vtkShader.Fragment,
+        "//VTK::Light::Impl",
+        True,
+        """
+        // Renaming variables passed from the Vertex Shader
+        vec3 color = vertexColorVSOutput.rgb;
+        vec3 point = centeredVertexMC;
+        float len = length(point);
+        float fColor = 2. - 2. * len;
+        vec3 coord = vec3(atan(point.x, point.y) / 6.2832 + .5, len * .4, .5);
+        for(int i = 1; i <= 7; i++) {
+            float power = pow(2., float(i));
+            fColor += (1.5 / power) * snoise(coord + 
+                vec3(0., -time * .005, time * .001), power * 16.);
+        }
+        if(fColor < 0) discard;
+        //color = vec3(fColor);
+        color *= fColor;
+        fragOutput0 = vec4(color, 1.);
+        """,
+        False
+    )
+
+    global timer
+    timer = 0
+
+    def timer_callback(obj, event):
+        global timer
+        timer += 1.
+        showm.render()
+
+    @window.vtk.calldata_type(window.vtk.VTK_OBJECT)
+    def vtk_shader_callback(caller, event, calldata=None):
+        program = calldata
+        global timer
+        if program is not None:
+            try:
+                program.SetUniformf("time", timer)
+            except ValueError:
+                pass
+
+    mapper.AddObserver(window.vtk.vtkCommand.UpdateShaderEvent,
+                       vtk_shader_callback)
+
+    showm.initialize()
+    showm.add_timer_callback(True, 100, timer_callback)
+    showm.start()
+
+
 if __name__ == "__main__":
     npt.run_module_suite()
