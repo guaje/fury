@@ -1162,7 +1162,6 @@ def test_sphere_on_canvas():
         in vec3 center;
         out vec3 centeredVertexMC;
         out vec3 cameraPosition;
-        out vec3 same;
         """,
         False
     )
@@ -1178,33 +1177,6 @@ def test_sphere_on_canvas():
         centeredVertexMC *= scalingFactor;
         
         cameraPosition = -MCVCMatrix[3].xyz * mat3(MCVCMatrix);
-        same = -MCVCMatrix[0].xyz * mat3(MCVCMatrix);
-        
-        mat4 modelView = MCVCMatrix;
-        //modelView[0][0] = 1.;
-        modelView[0][1] = 0.;
-        modelView[0][2] = 0.;
-        modelView[1][0] = 0.;
-        //modelView[1][1] = 1.;
-        modelView[1][2] = 0.;
-        modelView[2][0] = 0.;
-        modelView[2][1] = 0.;
-        //modelView[2][2] = 1.;
-        //vertexVCVSOutput = modelView * vertexMC;
-        
-        mat4 modelDevice = MCDCMatrix;
-        //modelDevice[0][0] = 1.;
-        modelDevice[0][1] = 0.;
-        modelDevice[0][2] = 0.;
-        modelDevice[1][0] = 0.;
-        //modelDevice[1][1] = 1.;
-        modelDevice[1][2] = 0.;
-        modelDevice[2][0] = 0.;
-        modelDevice[2][1] = 0.;
-        //modelDevice[2][2] = 1.;
-        //gl_Position = modelDevice * vertexMC;
-        
-        //error
         """,
         False
     )
@@ -1217,10 +1189,8 @@ def test_sphere_on_canvas():
         //VTK::ValuePass::Dec
         in vec3 centeredVertexMC;
         in vec3 cameraPosition;
-        in vec3 same;
         
         uniform vec3 Ext_camPos;
-        uniform vec3 Ext_focPnt;
         """,
         False
     )
@@ -1233,8 +1203,8 @@ def test_sphere_on_canvas():
         // Renaming variables passed from the Vertex Shader
         vec3 color = vertexColorVSOutput.rgb;
         vec3 point = centeredVertexMC;
-        float p = length(same - Ext_focPnt);
-        if(p < .5)
+        float dist = distance(cameraPosition, Ext_camPos);
+        if(dist < .0001)
             fragOutput0 = vec4(1, 0, 0, 1);
         else
             fragOutput0 = vec4(0, 1, 0, 1);
@@ -1260,18 +1230,30 @@ def test_sphere_on_canvas():
         camera = scene.GetActiveCamera()
         cam_pos = camera.GetPosition()
         foc_pnt = camera.GetFocalPoint()
+        cam_light_mat = camera.GetCameraLightTransformMatrix()
+        #comp_proj_mat = camera.GetCompositeProjectionTransformMatrix()
+        exp_proj_mat = camera.GetExplicitProjectionTransformMatrix()
+        eye_mat = camera.GetEyeTransformMatrix()
+        model_mat = camera.GetModelTransformMatrix()
+        model_view_mat = camera.GetModelViewTransformMatrix()
         proj_mat = camera.GetProjectionTransformMatrix(scene)
         view_mat = camera.GetViewTransformMatrix()
         program = calldata
         if program is not None:
+            #print(cam_pos)
+            #print(foc_pnt)
+            #print(cam_light_mat)
+            ##print(comp_proj_mat)
+            #print(exp_proj_mat)
+            #print(eye_mat)
+            #print(model_mat)
+            #print(model_view_mat)
+            #print(proj_mat)
+            #print(view_mat)
             program.SetUniform2f("Ext_res", res)
             program.SetUniform3f("Ext_camPos", cam_pos)
             program.SetUniform3f("Ext_focPnt", foc_pnt)
-            print(foc_pnt)
-            program.SetUniformMatrix("Ext_projectionMatrix", proj_mat)
-            print(proj_mat)
-            program.SetUniformMatrix("Ext_viewMatrix", view_mat)
-            print(proj_mat)
+            program.SetUniformMatrix("Ext_mat", view_mat)
 
     mapper.AddObserver(vtk.vtkCommand.UpdateShaderEvent, vtk_shader_callback)
 
