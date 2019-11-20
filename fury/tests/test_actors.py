@@ -1160,8 +1160,13 @@ def test_sphere_on_canvas():
         """
         //VTK::ValuePass::Dec
         in vec3 center;
+        
+        uniform mat4 Ext_mat;
+        
         out vec3 centeredVertexMC;
         out vec3 cameraPosition;
+        
+        out float matSim;
         """,
         False
     )
@@ -1177,6 +1182,11 @@ def test_sphere_on_canvas():
         centeredVertexMC *= scalingFactor;
         
         cameraPosition = -MCVCMatrix[3].xyz * mat3(MCVCMatrix);
+        
+        matSim = 0;
+        for(int i = 0; i < 3; i++) {
+            matSim += distance(MCVCMatrix[i].xyz, Ext_mat[i].xyz);
+        }
         """,
         False
     )
@@ -1189,6 +1199,8 @@ def test_sphere_on_canvas():
         //VTK::ValuePass::Dec
         in vec3 centeredVertexMC;
         in vec3 cameraPosition;
+        
+        in float matSim;
         
         uniform vec3 Ext_camPos;
         """,
@@ -1203,11 +1215,17 @@ def test_sphere_on_canvas():
         // Renaming variables passed from the Vertex Shader
         vec3 color = vertexColorVSOutput.rgb;
         vec3 point = centeredVertexMC;
+        if(matSim < 1)
+            fragOutput0 = vec4(1, 0, 0, 1);
+        else
+            fragOutput0 = vec4(0, 1, 0, 1);
+        /*
         float dist = distance(cameraPosition, Ext_camPos);
         if(dist < .0001)
             fragOutput0 = vec4(1, 0, 0, 1);
         else
             fragOutput0 = vec4(0, 1, 0, 1);
+        */
         /*
         float len = length(point);
         // VTK Fake Spheres
