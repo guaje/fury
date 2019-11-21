@@ -1079,6 +1079,9 @@ def test_sphere_on_canvas():
     from vtk.util.numpy_support import numpy_to_vtk
     import vtk
 
+    scene = window.Scene()
+    showm = window.ShowManager(scene, reset_camera=False)
+
     colors = 255 * np.array([
         [.85, .07, .21], [.56, .14, .85], [.16, .65, .20], [.95, .73, .06],
         [.95, .55, .05], [.62, .42, .75], [.26, .58, .85], [.24, .82, .95],
@@ -1146,7 +1149,7 @@ def test_sphere_on_canvas():
     canvas_actor = get_actor_from_polydata(polydata)
     canvas_actor.GetProperty().BackfaceCullingOff()
 
-    scene = window.Scene()
+    scene.add(canvas_actor)
 
     mapper = canvas_actor.GetMapper()
 
@@ -1165,6 +1168,7 @@ def test_sphere_on_canvas():
         
         out vec3 centeredVertexMC;
         out vec3 cameraPosition;
+        out vec3 viewUp;
         
         out float matSim;
         """,
@@ -1182,6 +1186,7 @@ def test_sphere_on_canvas():
         centeredVertexMC *= scalingFactor;
         
         cameraPosition = -MCVCMatrix[3].xyz * mat3(MCVCMatrix);
+        viewUp = vec3(MCVCMatrix[0][1], MCVCMatrix[1][1], MCVCMatrix[2][1]);
         
         matSim = 0;
         for(int i = 0; i < 3; i++) {
@@ -1199,10 +1204,12 @@ def test_sphere_on_canvas():
         //VTK::ValuePass::Dec
         in vec3 centeredVertexMC;
         in vec3 cameraPosition;
+        in vec3 viewUp;
         
         in float matSim;
         
         uniform vec3 Ext_camPos;
+        uniform vec3 Ext_viewUp;
         """,
         False
     )
@@ -1215,17 +1222,26 @@ def test_sphere_on_canvas():
         // Renaming variables passed from the Vertex Shader
         vec3 color = vertexColorVSOutput.rgb;
         vec3 point = centeredVertexMC;
+        /*
         if(matSim < 1)
             fragOutput0 = vec4(1, 0, 0, 1);
         else
             fragOutput0 = vec4(0, 1, 0, 1);
+        */
         /*
+        // Comparing camera position from vertex shader and python
         float dist = distance(cameraPosition, Ext_camPos);
         if(dist < .0001)
             fragOutput0 = vec4(1, 0, 0, 1);
         else
             fragOutput0 = vec4(0, 1, 0, 1);
         */
+        // Comparing view up from vertex shader and python
+        float dist = distance(viewUp, Ext_viewUp);
+        if(dist < .0001)
+            fragOutput0 = vec4(1, 0, 0, 1);
+        else
+            fragOutput0 = vec4(0, 1, 0, 1);
         /*
         float len = length(point);
         // VTK Fake Spheres
@@ -1248,6 +1264,7 @@ def test_sphere_on_canvas():
         camera = scene.GetActiveCamera()
         cam_pos = camera.GetPosition()
         foc_pnt = camera.GetFocalPoint()
+        view_up = camera.GetViewUp()
         cam_light_mat = camera.GetCameraLightTransformMatrix()
         #comp_proj_mat = camera.GetCompositeProjectionTransformMatrix()
         exp_proj_mat = camera.GetExplicitProjectionTransformMatrix()
@@ -1256,10 +1273,22 @@ def test_sphere_on_canvas():
         model_view_mat = camera.GetModelViewTransformMatrix()
         proj_mat = camera.GetProjectionTransformMatrix(scene)
         view_mat = camera.GetViewTransformMatrix()
+        mat = view_mat
+        np.set_printoptions(precision=3, suppress=True)
+        np_mat = np.zeros((4, 4))
+        for i in range(4):
+            for j in range(4):
+                np_mat[i, j] = mat.GetElement(i, j)
         program = calldata
         if program is not None:
-            #print(cam_pos)
-            #print(foc_pnt)
+            print("\nCamera position: {}".format(cam_pos))
+            print("Focal point: {}".format(foc_pnt))
+            print("View up: {}".format(view_up))
+            #print(mat)
+            print(np_mat)
+            print(np.dot(-np_mat[:3, 3], np_mat[:3, :3]))
+            a = np.array(cam_pos) - np.array(foc_pnt)
+            print(a / np.linalg.norm(a))
             #print(cam_light_mat)
             ##print(comp_proj_mat)
             #print(exp_proj_mat)
@@ -1271,9 +1300,21 @@ def test_sphere_on_canvas():
             program.SetUniform2f("Ext_res", res)
             program.SetUniform3f("Ext_camPos", cam_pos)
             program.SetUniform3f("Ext_focPnt", foc_pnt)
-            program.SetUniformMatrix("Ext_mat", view_mat)
+            program.SetUniform3f("Ext_viewUp", view_up)
+            program.SetUniformMatrix("Ext_mat", mat)
 
     mapper.AddObserver(vtk.vtkCommand.UpdateShaderEvent, vtk_shader_callback)
+
+    global timer
+    timer = 0
+
+    def timer_callback(obj, event):
+        global timer
+        timer += 1.
+        showm.render()
+        #scene.azimuth(5)
+        #scene.elevation(5)
+        #scene.roll(5)
 
     label = vtk.vtkOpenGLBillboardTextActor3D()
     label.SetInput("FURY Rocks!!!")
@@ -1281,17 +1322,20 @@ def test_sphere_on_canvas():
     label.GetTextProperty().SetFontSize(40)
     label.GetTextProperty().SetColor(.5, .5, .5)
     # TODO: Get Billboard's mapper
+    #l_mapper = label.GetActors()
 
     # TODO: Write issue
-    # TODO: Add callback
 
     #scene.add(label)
     scene.add(actor.axes())
-    scene.add(canvas_actor)
+
     scene.background((1, 1, 1))
 
-    #scene.set_camera(position=(20, 0, 50))
-    window.show(scene, reset_camera=True)
+    #scene.set_camera(position=(1.5, 2.5, 15), focal_point=(1.5, 2.5, 1.5), view_up=(0, 1, 0))
+    scene.set_camera(position=(1.5, 2.5, 25), focal_point=(0, 0, 0), view_up=(0, 1, 0))
+    showm.initialize()
+    showm.add_timer_callback(True, 100, timer_callback)
+    showm.start()
 
 
 def test_fireballs_on_canvas():
