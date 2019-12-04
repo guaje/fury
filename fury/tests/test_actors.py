@@ -1073,7 +1073,7 @@ def test_grid(_interactive=False):
     npt.assert_equal(report.objects > 6, True)
 
 
-def test_sphere_on_canvas():
+def test_spheres_on_canvas():
     from fury.utils import get_actor_from_polydata, set_polydata_triangles, \
         set_polydata_vertices, set_polydata_colors
     from vtk.util.numpy_support import numpy_to_vtk
@@ -1170,7 +1170,26 @@ def test_sphere_on_canvas():
         out vec3 cameraPosition;
         out vec3 viewUp;
         
-        out float matSim;
+        mat3 vec2VecRotMat(vec3 u, vec3 v) {
+            // Cross product is the first step to find R
+            vec3 w = cross(u, v);
+            // if everything ok, normalize w
+            w = normalize(w);
+            // vp is in plane of u,v, perpendicular to u
+            vec3 vp = (v - ((u * v) * u));
+            vp = normalize(w);
+            // (u vp w) is an orthonormal basis
+            mat3 P;
+            P[0] = vec3(u.x, vp.x, w.x);
+            P[1] = vec3(u.y, vp.y, w.y);
+            P[2] = vec3(u.z, vp.z, w.z);
+            mat3 Pt = transpose(P);
+            float cosa = dot(u, v);
+            float sina = sqrt(1 - pow(cosa, 2));
+            mat3 R = mat3(mat2(cosa, sina, -sina, cosa));
+            mat3 Rp = Pt * (R * P);
+            return Rp;
+        }
         """,
         False
     )
@@ -1187,11 +1206,10 @@ def test_sphere_on_canvas():
         
         cameraPosition = -MCVCMatrix[3].xyz * mat3(MCVCMatrix);
         viewUp = vec3(MCVCMatrix[0][1], MCVCMatrix[1][1], MCVCMatrix[2][1]);
+        vec3 cameraDirection = vec3(MCVCMatrix[0][2], MCVCMatrix[1][2], MCVCMatrix[2][2]);
         
-        matSim = 0;
-        for(int i = 0; i < 3; i++) {
-            matSim += distance(MCVCMatrix[i].xyz, Ext_mat[i].xyz);
-        }
+        mat4 rotMat = mat4(vec2VecRotMat(normalize(gl_Position).xyz, cameraDirection));
+        gl_Position = rotMat * vertexMC;
         """,
         False
     )
@@ -1205,8 +1223,6 @@ def test_sphere_on_canvas():
         in vec3 centeredVertexMC;
         in vec3 cameraPosition;
         in vec3 viewUp;
-        
-        in float matSim;
         
         uniform vec3 Ext_camPos;
         uniform vec3 Ext_viewUp;
@@ -1223,12 +1239,6 @@ def test_sphere_on_canvas():
         vec3 color = vertexColorVSOutput.rgb;
         vec3 point = centeredVertexMC;
         /*
-        if(matSim < 1)
-            fragOutput0 = vec4(1, 0, 0, 1);
-        else
-            fragOutput0 = vec4(0, 1, 0, 1);
-        */
-        /*
         // Comparing camera position from vertex shader and python
         float dist = distance(cameraPosition, Ext_camPos);
         if(dist < .0001)
@@ -1236,13 +1246,14 @@ def test_sphere_on_canvas():
         else
             fragOutput0 = vec4(0, 1, 0, 1);
         */
+        /*
         // Comparing view up from vertex shader and python
         float dist = distance(viewUp, Ext_viewUp);
         if(dist < .0001)
             fragOutput0 = vec4(1, 0, 0, 1);
         else
             fragOutput0 = vec4(0, 1, 0, 1);
-        /*
+        */
         float len = length(point);
         // VTK Fake Spheres
         float radius = 1.;
@@ -1253,7 +1264,6 @@ def test_sphere_on_canvas():
         float df = max(0, dot(direction, normalizedPoint));
         float sf = pow(df, 24);
         fragOutput0 = vec4(max(df * color, sf * vec3(1)), 1);
-        */
         """,
         False
     )
@@ -1281,14 +1291,14 @@ def test_sphere_on_canvas():
                 np_mat[i, j] = mat.GetElement(i, j)
         program = calldata
         if program is not None:
-            print("\nCamera position: {}".format(cam_pos))
-            print("Focal point: {}".format(foc_pnt))
-            print("View up: {}".format(view_up))
+            #print("\nCamera position: {}".format(cam_pos))
+            #print("Focal point: {}".format(foc_pnt))
+            #print("View up: {}".format(view_up))
             #print(mat)
-            print(np_mat)
-            print(np.dot(-np_mat[:3, 3], np_mat[:3, :3]))
-            a = np.array(cam_pos) - np.array(foc_pnt)
-            print(a / np.linalg.norm(a))
+            #print(np_mat)
+            #print(np.dot(-np_mat[:3, 3], np_mat[:3, :3]))
+            #a = np.array(cam_pos) - np.array(foc_pnt)
+            #print(a / np.linalg.norm(a))
             #print(cam_light_mat)
             ##print(comp_proj_mat)
             #print(exp_proj_mat)
@@ -1312,7 +1322,7 @@ def test_sphere_on_canvas():
         global timer
         timer += 1.
         showm.render()
-        #scene.azimuth(5)
+        scene.azimuth(5)
         #scene.elevation(5)
         #scene.roll(5)
 
@@ -1323,8 +1333,6 @@ def test_sphere_on_canvas():
     label.GetTextProperty().SetColor(.5, .5, .5)
     # TODO: Get Billboard's mapper
     #l_mapper = label.GetActors()
-
-    # TODO: Write issue
 
     #scene.add(label)
     scene.add(actor.axes())
