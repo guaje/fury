@@ -1227,10 +1227,19 @@ def test_spheres_on_canvas():
     )
 
     scene = window.Scene()
+    scene.background((1, 1, 1))
+    showm = window.ShowManager(scene)
+
     scene.add(canvas_actor)
     scene.add(actor.axes())
-    scene.background((1, 1, 1))
-    window.show(scene)
+
+    def win_callback(obj, event):
+        print(scene.frame_rate)
+
+    showm.add_window_callback(win_callback)
+
+    showm.initialize()
+    showm.start()
 
 
 def test_fireballs_on_canvas():
