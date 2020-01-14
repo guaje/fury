@@ -1088,8 +1088,8 @@ def test_spheres_on_canvas():
     ])
     n_points = colors.shape[0]
     """
-    n_points = 10000
-    scale = 10
+    n_points = 1000000
+    scale = 100
     colors = 255 * np.random.rand(n_points, 3)
     centers = 5 * scale * np.random.rand(n_points, 3) - (2.5 * scale)
     radius = np.random.rand(n_points)
