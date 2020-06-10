@@ -688,6 +688,41 @@ def test_peak_slicer(interactive=False):
     npt.assert_raises(ValueError, actor.peak_slicer, data_6d, data_6d)
 
 
+def test_peak_slicer_memory():
+    from fury import actor, window
+    from vtk.util import numpy_support
+    import numpy as np
+    _peak_dirs = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype='f4')
+    peak_dirs = np.zeros((1, 1, 1, 3, 3))
+    np.random.seed(42)
+    peak_values = np.random.rand(1, 1, 1, 3)
+    peak_dirs[:, :, :] = _peak_dirs
+    scene = window.Scene()
+    peaks_actor = actor.peak_slicer(peak_dirs, colors=None)
+    peaks_geometry = numpy_support.vtk_to_numpy(
+        peaks_actor.GetMapper().GetInput().GetPoints().GetData())
+    peaks_colors = numpy_support.vtk_to_numpy(
+        peaks_actor.GetMapper().GetInput().GetPointData().GetScalars())
+    scene.add(peaks_actor)
+    scene.add(actor.axes((1, 1, 1)))
+    window.show(scene)
+
+    peaks_colors += 255
+    # peaks_actor.GetMapper().GetInput().GetPointData().GetScalars().Modified()
+    # peaks_actor.GetMapper().GetInput().ComputeBounds()
+    window.show(scene)
+
+    peaks_colors = numpy_support.vtk_to_numpy(
+        peaks_actor.GetMapper().GetInput().GetPointData().GetScalars())
+
+    colors = np.array([[255, 0, 255], [255, 255, 0], [0, 255, 255]])
+    updated_colors = np.repeat(colors, 2, axis=0)
+    peaks_colors[:] = updated_colors
+    updated_colors[:, 0] = 255
+    peaks_colors[:, 0] = 255
+    window.show(scene)
+
+
 @pytest.mark.skipif(not have_dipy, reason="Requires DIPY")
 def test_tensor_slicer(interactive=False):
 
