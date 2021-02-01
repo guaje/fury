@@ -68,12 +68,12 @@ if __name__ == '__main__':
     metallic_coef = 1.
     roughness_coef = 0.
 
-    #mirror_actor.GetProperty().SetMetallic(metallic_coef)
-    #mirror_actor.GetProperty().SetRoughness(roughness_coef)
+    mirror_actor.GetProperty().SetMetallic(metallic_coef)
+    mirror_actor.GetProperty().SetRoughness(roughness_coef)
 
     # TODO: Try metallicity/roughness shader implementation
     # TODO: Create big_metal and big_rough arrays and pass them to VS
-    mirror_vertices = vertices_from_actor(mirror_actor)
+    #mirror_vertices = vertices_from_actor(mirror_actor)
     # TODO: Forward metal and rough variables to FS attributeVSOutput
     # TODO: Update metallicUniform and roughnessUniform in ValuePass::Impl
 
