@@ -10,7 +10,7 @@ vec3 worldRefract = normalize(envMatrix * refract(-V, N, ETA));
 //fragOutput0 = vec4(prefilteredColorV3, opacity);
 //fragOutput0 = vec4(mix(prefilteredColorV3, prefilteredColor, fresnel), opacity);
 prefilteredColor = textureLod(prefilterTex, mix(worldRefract, worldReflect, fresnel), roughness * prefilterMaxLevel).rgb;
-fragOutput0 = vec4(prefilteredColor, opacity);
+//fragOutput0 = vec4(prefilteredColor, opacity);
 //fragOutput0 = vec4(prefilteredColorV3, opacity);
 
 //fragOutput0 = vec4(specularColor, opacity);

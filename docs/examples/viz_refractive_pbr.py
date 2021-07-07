@@ -30,6 +30,11 @@ def build_label(text, font_size=16, color=(1, 1, 1), bold=False, italic=False,
     return label
 
 
+def change_slice_ao_strength(slider):
+    global obj_actor
+    obj_actor.GetProperty().SetOcclusionStrength(slider._value)
+
+
 def change_slice_ior_1(slider):
     global ior_1
     ior_1 = slider._value
@@ -48,16 +53,6 @@ def change_slice_metallic(slider):
 def change_slice_roughness(slider):
     global obj_actor
     obj_actor.GetProperty().SetRoughness(slider._value)
-
-
-def change_slice_specular(slider):
-    global obj_actor
-    obj_actor.GetProperty().SetSpecular(slider._value)
-
-
-def change_slice_specular_power(slider):
-    global obj_actor
-    obj_actor.GetProperty().SetSpecularPower(slider._value)
 
 
 def change_slice_opacity(slider):
@@ -148,6 +143,15 @@ if __name__ == '__main__':
     #obj_actor = obj_surface()
     obj_actor = obj_spheres()
 
+    #ambient = obj_actor.GetProperty().GetAmbient()
+    #ambient_color = obj_actor.GetProperty().GetAmbientColor()
+    #diffuse = obj_actor.GetProperty().GetDiffuse()
+    #diffuseColor = obj_actor.GetProperty().GetDiffuseColor()
+    #specular = obj_actor.GetProperty().GetSpecular()
+    #specular_power = obj_actor.GetProperty().GetSpecularPower()
+    #specular_color = obj_actor.GetProperty().GetSpecularColor()
+    #specular_color = vtk.vtkNamedColors().GetColor3d('White')
+
     ior_1 = 1.  # Air
     #ior_1 = 1.333  # Water(20 °C)
     ior_2 = 1.5  # Glass
@@ -155,19 +159,17 @@ if __name__ == '__main__':
     #ior_2 = .47  # Gold
     #ior_2 = 1.  # Air
     #ior_2 = 2.33  # Platinum
-    metallic = .0
-    roughness = .0
-    specular = .0
-    specular_power = .0
-    specular_color = vtk.vtkNamedColors().GetColor3d('White')
 
     obj_actor.GetProperty().SetInterpolationToPBR()
+    #metallic = .0
+    metallic = obj_actor.GetProperty().GetMetallic()
+    roughness = .0
+    #roughness = obj_actor.GetProperty().GetRoughness()
+    emissive_factor = obj_actor.GetProperty().GetEmissiveFactor()
+    ao_strength = obj_actor.GetProperty().GetOcclusionStrength()
+
     obj_actor.GetProperty().SetMetallic(metallic)
     obj_actor.GetProperty().SetRoughness(roughness)
-
-    #obj_actor.GetProperty().SetSpecular(specular)
-    #obj_actor.GetProperty().SetSpecularPower(specular_power)
-    #obj_actor.GetProperty().SetSpecularColor(specular_color)
 
     opacity = 1.
     obj_actor.GetProperty().SetOpacity(opacity)
@@ -177,10 +179,11 @@ if __name__ == '__main__':
     fs_dec_code = load('refractive_dec.frag')
     fs_impl_code = load('refractive_impl.frag')
 
-    # shader_to_actor(obj_actor, 'vertex', debug=True)
+    #shader_to_actor(obj_actor, 'vertex', debug=True)
+    #shader_to_actor(obj_actor, 'fragment', debug=True)
     shader_to_actor(obj_actor, 'fragment', decl_code=fs_dec_code)
     shader_to_actor(obj_actor, 'fragment', impl_code=fs_impl_code,
-                    block='light', debug=False)
+                    block='light')
 
     cubemap_fns = [read_viz_textures('waterfall-skybox-px.jpg'),
                    read_viz_textures('waterfall-skybox-nx.jpg'),
@@ -212,7 +215,7 @@ if __name__ == '__main__':
     scene.add(obj_actor)
     scene.add(skybox_actor)
 
-    # window.show(scene)
+    #window.show(scene)
 
     show_m = window.ShowManager(scene=scene, reset_camera=False,
                                 order_transparent=True)
@@ -227,8 +230,7 @@ if __name__ == '__main__':
     slider_label_ior_2 = build_label('IOR2')
     slider_label_metallic = build_label('Metallic')
     slider_label_roughness = build_label('Roughness')
-    slider_label_specular = build_label('Specular')
-    slider_label_specular_power = build_label('Specular Power')
+    slider_label_ao_strength = build_label('AO Strength')
 
     label_pad_x = .06
 
@@ -237,8 +239,7 @@ if __name__ == '__main__':
     pbr_panel.add_element(slider_label_ior_2, (label_pad_x, .77))
     pbr_panel.add_element(slider_label_metallic, (label_pad_x, .68))
     pbr_panel.add_element(slider_label_roughness, (label_pad_x, .59))
-    pbr_panel.add_element(slider_label_specular, (label_pad_x, .5))
-    pbr_panel.add_element(slider_label_specular_power, (label_pad_x, .41))
+    pbr_panel.add_element(slider_label_ao_strength, (label_pad_x, .5))
 
     length = 150
     text_template = '{value:.1f}'
@@ -255,19 +256,15 @@ if __name__ == '__main__':
     slider_slice_roughness = ui.LineSlider2D(
         initial_value=roughness, max_value=1, length=length,
         text_template=text_template)
-    slider_slice_specular = ui.LineSlider2D(
-        initial_value=specular, max_value=1, length=length,
-        text_template=text_template)
-    slider_slice_specular_power = ui.LineSlider2D(
-        initial_value=specular_power, max_value=1, length=length,
+    slider_slice_ao_strength = ui.LineSlider2D(
+        initial_value=ao_strength, max_value=1, length=length,
         text_template=text_template)
 
     slider_slice_ior_1.on_change = change_slice_ior_1
     slider_slice_ior_2.on_change = change_slice_ior_2
     slider_slice_metallic.on_change = change_slice_metallic
     slider_slice_roughness.on_change = change_slice_roughness
-    #slider_slice_specular.on_change = change_slice_specular
-    #slider_slice_specular_power.on_change = change_slice_specular_power
+    slider_slice_ao_strength.on_change = change_slice_ao_strength
 
     slice_pad_x = .46
 
@@ -275,8 +272,7 @@ if __name__ == '__main__':
     pbr_panel.add_element(slider_slice_ior_2, (slice_pad_x, .77))
     pbr_panel.add_element(slider_slice_metallic, (slice_pad_x, .68))
     pbr_panel.add_element(slider_slice_roughness, (slice_pad_x, .59))
-    pbr_panel.add_element(slider_slice_specular, (slice_pad_x, .5))
-    pbr_panel.add_element(slider_slice_specular_power, (slice_pad_x, .41))
+    pbr_panel.add_element(slider_slice_ao_strength, (slice_pad_x, .5))
 
     scene.add(pbr_panel)
 
