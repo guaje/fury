@@ -137,7 +137,7 @@ def win_callback(obj, event):
 
 
 if __name__ == '__main__':
-    global pbr_panel, control_panel, obj_actor, size
+    global control_panel, ior_1, ior_2, obj_actor, pbr_panel, size
 
     #obj_actor = obj_brain()
     #obj_actor = obj_surface()
