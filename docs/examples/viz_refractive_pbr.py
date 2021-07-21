@@ -2,12 +2,16 @@ from dipy.data import get_fnames
 from fury import actor, ui, window
 from fury.data import read_viz_textures
 from fury.io import load_polydata
-from fury.utils import get_actor_from_polydata
+from fury.utils import (get_actor_from_polydata, set_polydata_colors,
+                        set_polydata_vertices, set_polydata_triangles)
 from fury.shaders import add_shader_callback, load, shader_to_actor
+from nibabel import gifti
 from scipy.spatial import Delaunay
 
 
+import gzip
 import math
+import nibabel as nib
 import numpy as np
 import os
 import random
@@ -80,10 +84,42 @@ def get_cubemap(files_names):
     return texture
 
 
+def load_gifti_gzip(fname):
+    with gzip.open(fname) as f:
+        as_bytes = f.read()
+        parser = gifti.GiftiImage.parser()
+        parser.parse(as_bytes)
+        return parser.img
+
+
 def obj_brain():
     brain_lh = get_fnames(name='fury_surface')
     polydata = load_polydata(brain_lh)
     return get_actor_from_polydata(polydata)
+
+
+def obj_fsaverage():
+    fsavg_dir = '/run/media/guaje/Data/Data/repo_files/fsaverage/fsaverage/'
+
+    infl_right_name = 'infl_right.gii.gz'
+    pial_right_name = 'pial_right.gii.gz'
+
+    infl_right_fname = os.path.join(fsavg_dir, infl_right_name)
+    #infl_right_gii = nib.load(infl_right_fname)
+    infl_right_gii = load_gifti_gzip(infl_right_fname)
+
+    infl_right_points = infl_right_gii.darrays[0].data
+    infl_right_triangles = infl_right_gii.darrays[1].data
+
+    infl_right_polydata = vtk.vtkPolyData()
+
+    set_polydata_vertices(infl_right_polydata, infl_right_points)
+    set_polydata_triangles(infl_right_polydata, infl_right_triangles)
+
+    # TODO: Fix coloring
+    #right_colors = np.array([[0, 255, 0] * len(infl_right_points)])
+    #set_polydata_colors(infl_right_polydata, right_colors)
+    return get_actor_from_polydata(infl_right_polydata)
 
 
 def obj_spheres(radii=2, theta=32, phi=32):
@@ -140,6 +176,7 @@ if __name__ == '__main__':
     global control_panel, ior_1, ior_2, obj_actor, pbr_panel, size
 
     #obj_actor = obj_brain()
+    #obj_actor = obj_fsaverage()
     #obj_actor = obj_surface()
     obj_actor = obj_spheres()
 
