@@ -11,7 +11,6 @@ from scipy.spatial import Delaunay
 
 import gzip
 import math
-import nibabel as nib
 import numpy as np
 import os
 import random
@@ -100,12 +99,19 @@ def obj_brain():
 
 def obj_fsaverage():
     fsavg_dir = '/run/media/guaje/Data/Data/repo_files/fsaverage/fsaverage/'
+    fmri_dir = '/run/media/guaje/Data/Data/repo_files/pipelines/fMRI/' \
+               'NeuroVault-10426/'
 
     infl_right_name = 'infl_right.gii.gz'
     pial_right_name = 'pial_right.gii.gz'
 
+    task_img_name = 'task001_left_vs_right_motor.nii.gz'
+
     infl_right_fname = os.path.join(fsavg_dir, infl_right_name)
-    #infl_right_gii = nib.load(infl_right_fname)
+    pial_right_fname = os.path.join(fsavg_dir, pial_right_name)
+
+    task_img_fname = os.path.join(fmri_dir, task_img_name)
+
     infl_right_gii = load_gifti_gzip(infl_right_fname)
 
     infl_right_points = infl_right_gii.darrays[0].data
@@ -116,9 +122,8 @@ def obj_fsaverage():
     set_polydata_vertices(infl_right_polydata, infl_right_points)
     set_polydata_triangles(infl_right_polydata, infl_right_triangles)
 
-    # TODO: Fix coloring
-    #right_colors = np.array([[0, 255, 0] * len(infl_right_points)])
-    #set_polydata_colors(infl_right_polydata, right_colors)
+    infl_right_colors = np.array([[0, 255, 0]] * len(infl_right_points))
+    set_polydata_colors(infl_right_polydata, infl_right_colors)
     return get_actor_from_polydata(infl_right_polydata)
 
 
@@ -176,9 +181,9 @@ if __name__ == '__main__':
     global control_panel, ior_1, ior_2, obj_actor, pbr_panel, size
 
     #obj_actor = obj_brain()
-    #obj_actor = obj_fsaverage()
+    obj_actor = obj_fsaverage()
     #obj_actor = obj_surface()
-    obj_actor = obj_spheres()
+    #obj_actor = obj_spheres()
 
     #ambient = obj_actor.GetProperty().GetAmbient()
     #ambient_color = obj_actor.GetProperty().GetAmbientColor()
