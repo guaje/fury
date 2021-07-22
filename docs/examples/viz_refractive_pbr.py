@@ -1,11 +1,12 @@
 from dipy.data import get_fnames
-from fury import actor, ui, window
+from fury import actor, colormap, ui, window
 from fury.data import read_viz_textures
 from fury.io import load_polydata
 from fury.utils import (get_actor_from_polydata, set_polydata_colors,
                         set_polydata_vertices, set_polydata_triangles)
 from fury.shaders import add_shader_callback, load, shader_to_actor
 from nibabel import gifti
+from nilearn import surface
 from scipy.spatial import Delaunay
 
 
@@ -97,7 +98,7 @@ def obj_brain():
     return get_actor_from_polydata(polydata)
 
 
-def obj_fsaverage():
+def obj_fsaverage(cmap='coolwarm'):
     fsavg_dir = '/run/media/guaje/Data/Data/repo_files/fsaverage/fsaverage/'
     fmri_dir = '/run/media/guaje/Data/Data/repo_files/pipelines/fMRI/' \
                'NeuroVault-10426/'
@@ -122,7 +123,9 @@ def obj_fsaverage():
     set_polydata_vertices(infl_right_polydata, infl_right_points)
     set_polydata_triangles(infl_right_polydata, infl_right_triangles)
 
-    infl_right_colors = np.array([[0, 255, 0]] * len(infl_right_points))
+    texture = surface.vol_to_surf(task_img_fname, pial_right_fname)
+
+    infl_right_colors = colormap.create_colormap(texture, name=cmap) * 255
     set_polydata_colors(infl_right_polydata, infl_right_colors)
     return get_actor_from_polydata(infl_right_polydata)
 
