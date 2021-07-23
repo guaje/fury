@@ -1,17 +1,40 @@
-from dipy.data import get_fnames
-from fury import actor, ui, window
+from dipy.io.image import load_nifti
+from fury import actor, colormap, ui, window
 from fury.data import read_viz_textures
-from fury.io import load_polydata
-from fury.utils import get_actor_from_polydata
+from fury.utils import (colors_from_actor, get_actor_from_polydata,
+                        set_polydata_colors, set_polydata_vertices,
+                        set_polydata_triangles, update_actor)
 from fury.shaders import add_shader_callback, load, shader_to_actor
-from scipy.spatial import Delaunay
+from nibabel.nifti1 import Nifti1Image
+from nilearn import surface
 
 
-import math
 import numpy as np
 import os
-import random
 import vtk
+
+
+_FSAVG_DIR = '/run/media/guaje/Data/Data/repo_files/fsaverage/fsaverage/'
+_NEUROVAULT_DIR = '/run/media/guaje/Data/Data/repo_files/pipelines/fMRI/' \
+                  'NeuroVault-10426/'
+_HAXBY_DIR = '/run/media/guaje/Data/Data/repo_files/Haxby_2001/subj2/'
+
+_MOTOR_FNAME = os.path.join(_NEUROVAULT_DIR,
+                            'task001_left_vs_right_motor.nii.gz')
+
+_BOLD_FNAME = os.path.join(_HAXBY_DIR, 'bold.nii.gz')
+
+_HEMI_DICT = {
+    'left': {
+        'infl': os.path.join(_FSAVG_DIR, 'infl_left.gii.gz'),
+        'pial': os.path.join(_FSAVG_DIR, 'pial_left.gii.gz'),
+        'sulc': os.path.join(_FSAVG_DIR, 'sulc_left.gii.gz')
+    },
+    'right': {
+        'infl': os.path.join(_FSAVG_DIR, 'infl_right.gii.gz'),
+        'pial': os.path.join(_FSAVG_DIR, 'pial_right.gii.gz'),
+        'sulc': os.path.join(_FSAVG_DIR, 'sulc_right.gii.gz')
+    }}
 
 
 def build_label(text, font_size=16, color=(1, 1, 1), bold=False, italic=False,
@@ -31,33 +54,48 @@ def build_label(text, font_size=16, color=(1, 1, 1), bold=False, italic=False,
 
 
 def change_slice_ao_strength(slider):
-    global obj_actor
-    obj_actor.GetProperty().SetOcclusionStrength(slider._value)
+    global right_hemi_actor
+    right_hemi_actor.GetProperty().SetOcclusionStrength(slider.value)
 
 
 def change_slice_ior_1(slider):
     global ior_1
-    ior_1 = slider._value
+    ior_1 = slider.value
 
 
 def change_slice_ior_2(slider):
     global ior_2
-    ior_2 = slider._value
+    ior_2 = slider.value
 
 
 def change_slice_metallic(slider):
-    global obj_actor
-    obj_actor.GetProperty().SetMetallic(slider._value)
+    global right_hemi_actor
+    right_hemi_actor.GetProperty().SetMetallic(slider.value)
 
 
 def change_slice_roughness(slider):
-    global obj_actor
-    obj_actor.GetProperty().SetRoughness(slider._value)
+    global right_hemi_actor
+    right_hemi_actor.GetProperty().SetRoughness(slider.value)
 
 
 def change_slice_opacity(slider):
-    global obj_actor
-    obj_actor.GetProperty().SetOpacity(slider._value)
+    global right_hemi_actor
+    right_hemi_actor.GetProperty().SetOpacity(slider.value)
+
+
+def change_slice_volume(slider):
+    global fmri_affine, fmri_img, right_hemi_actor, right_pial_mesh, volume
+    volume = int(np.round(slider.value))
+    fmri_nii = Nifti1Image(fmri_img[..., volume], fmri_affine)
+    right_colors = colors_from_actor(right_hemi_actor)
+    right_colors[:] = calculate_colors(fmri_nii, right_pial_mesh)
+    update_actor(right_hemi_actor)
+
+
+def calculate_colors(nifti, mesh, cmap='coolwarm'):
+    texture = surface.vol_to_surf(nifti, mesh)
+    max_val = np.max(np.abs(texture))
+    return colormap.create_colormap(texture, name=cmap) * 255
 
 
 def get_cubemap(files_names):
@@ -80,43 +118,13 @@ def get_cubemap(files_names):
     return texture
 
 
-def obj_brain():
-    brain_lh = get_fnames(name='fury_surface')
-    polydata = load_polydata(brain_lh)
+def get_hemisphere_actor(fname, colors=None):
+    points, triangles = surface.load_surf_mesh(fname)
+    polydata = vtk.vtkPolyData()
+    set_polydata_vertices(polydata, points)
+    set_polydata_triangles(polydata, triangles)
+    set_polydata_colors(polydata, colors)
     return get_actor_from_polydata(polydata)
-
-
-def obj_spheres(radii=2, theta=32, phi=32):
-    centers = [[-5, 5, 0], [0, 5, 0], [5, 5, 0], [-5, 0, 0], [0, 0, 0],
-               [5, 0, 0], [-5, -5, 0], [0, -5, 0], [5, -5, 0]]
-    colors = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 1, 1], [1, 0, 1], [1, 1, 0],
-              [0, 0, 0], [.5, .5, .5], [1, 1, 1]]
-    return actor.sphere(centers, colors, radii=radii, theta=theta, phi=phi)
-
-
-def obj_surface():
-    size = 11
-    vertices = list()
-    for i in range(-size, size):
-        for j in range(-size, size):
-            fact1 = - math.sin(i) * math.cos(j)
-            fact2 = - math.exp(abs(1 - math.sqrt(i ** 2 + j ** 2) / math.pi))
-            z_coord = -abs(fact1 * fact2)
-            vertices.append([i, j, z_coord])
-    c_arr = np.random.rand(len(vertices), 3)
-    random.shuffle(vertices)
-    vertices = np.array(vertices)
-    tri = Delaunay(vertices[:, [0, 1]])
-    faces = tri.simplices
-    c_loop = [None, c_arr]
-    f_loop = [None, faces]
-    s_loop = [None, "butterfly", "loop"]
-    for smooth_type in s_loop:
-        for face in f_loop:
-            for color in c_loop:
-                surface_actor = actor.surface(vertices, faces=face,
-                                              colors=color, smooth=smooth_type)
-    return surface_actor
 
 
 def uniforms_callback(_caller, _event, calldata=None):
@@ -137,52 +145,54 @@ def win_callback(obj, event):
 
 
 if __name__ == '__main__':
-    global control_panel, ior_1, ior_2, obj_actor, pbr_panel, size
+    global control_panel, fmri_affine, fmri_img, ior_1, ior_2, pbr_panel, \
+        right_hemi_actor, right_pial_mesh, size, volume
 
-    #obj_actor = obj_brain()
-    #obj_actor = obj_surface()
-    obj_actor = obj_spheres()
+    fmri_img, fmri_affine, fmri_nii = load_nifti(_MOTOR_FNAME, return_img=True)
+    #fmri_img, fmri_affine = load_nifti(_BOLD_FNAME)
+    img_shape = fmri_img.shape
+    volume = 0
+    num_volumes = img_shape[3] - 1 if len(img_shape) == 4 else 1
+    #fmri_nii = Nifti1Image(fmri_img[..., volume], fmri_affine)
 
-    #ambient = obj_actor.GetProperty().GetAmbient()
-    #ambient_color = obj_actor.GetProperty().GetAmbientColor()
-    #diffuse = obj_actor.GetProperty().GetDiffuse()
-    #diffuseColor = obj_actor.GetProperty().GetDiffuseColor()
-    #specular = obj_actor.GetProperty().GetSpecular()
-    #specular_power = obj_actor.GetProperty().GetSpecularPower()
-    #specular_color = obj_actor.GetProperty().GetSpecularColor()
-    #specular_color = vtk.vtkNamedColors().GetColor3d('White')
+    right_pial_mesh = surface.load_surf_mesh(_HEMI_DICT['right']['pial'])
+
+    right_colors = calculate_colors(fmri_nii, right_pial_mesh)
+
+    right_hemi_actor = get_hemisphere_actor(_HEMI_DICT['right']['infl'],
+                                            colors=right_colors)
 
     ior_1 = 1.  # Air
-    #ior_1 = 1.333  # Water(20 °C)
+    # ior_1 = 1.333  # Water(20 °C)
     ior_2 = 1.5  # Glass
-    #ior_2 = .18  # Silver
-    #ior_2 = .47  # Gold
-    #ior_2 = 1.  # Air
-    #ior_2 = 2.33  # Platinum
+    # ior_2 = .18  # Silver
+    # ior_2 = .47  # Gold
+    # ior_2 = 1.  # Air
+    # ior_2 = 2.33  # Platinum
 
-    obj_actor.GetProperty().SetInterpolationToPBR()
+    right_hemi_actor.GetProperty().SetInterpolationToPBR()
     #metallic = .0
-    metallic = obj_actor.GetProperty().GetMetallic()
+    metallic = right_hemi_actor.GetProperty().GetMetallic()
     roughness = .0
-    #roughness = obj_actor.GetProperty().GetRoughness()
-    emissive_factor = obj_actor.GetProperty().GetEmissiveFactor()
-    ao_strength = obj_actor.GetProperty().GetOcclusionStrength()
+    #roughness = right_surf_actor.GetProperty().GetRoughness()
+    emissive_factor = right_hemi_actor.GetProperty().GetEmissiveFactor()
+    ao_strength = right_hemi_actor.GetProperty().GetOcclusionStrength()
 
-    obj_actor.GetProperty().SetMetallic(metallic)
-    obj_actor.GetProperty().SetRoughness(roughness)
+    right_hemi_actor.GetProperty().SetMetallic(metallic)
+    right_hemi_actor.GetProperty().SetRoughness(roughness)
 
     opacity = 1.
-    obj_actor.GetProperty().SetOpacity(opacity)
+    right_hemi_actor.GetProperty().SetOpacity(opacity)
 
-    add_shader_callback(obj_actor, uniforms_callback)
+    add_shader_callback(right_hemi_actor, uniforms_callback)
 
     fs_dec_code = load('refractive_dec.frag')
     fs_impl_code = load('refractive_impl.frag')
 
-    #shader_to_actor(obj_actor, 'vertex', debug=True)
-    #shader_to_actor(obj_actor, 'fragment', debug=True)
-    shader_to_actor(obj_actor, 'fragment', decl_code=fs_dec_code)
-    shader_to_actor(obj_actor, 'fragment', impl_code=fs_impl_code,
+    #shader_to_actor(right_surf_actor, 'vertex', debug=True)
+    #shader_to_actor(right_surf_actor, 'fragment', debug=True)
+    shader_to_actor(right_hemi_actor, 'fragment', decl_code=fs_dec_code)
+    shader_to_actor(right_hemi_actor, 'fragment', impl_code=fs_impl_code,
                     block='light')
 
     cubemap_fns = [read_viz_textures('waterfall-skybox-px.jpg'),
@@ -212,7 +222,7 @@ if __name__ == '__main__':
     else:
         scene.SetEnvironmentCubeMap(cubemap)
 
-    scene.add(obj_actor)
+    scene.add(right_hemi_actor)
     scene.add(skybox_actor)
 
     #window.show(scene)
@@ -276,24 +286,32 @@ if __name__ == '__main__':
 
     scene.add(pbr_panel)
 
-    control_panel = ui.Panel2D((320, 80), position=(-25, 510),
+    control_panel = ui.Panel2D((320, 130), position=(-25, 510),
                                color=(.25, .25, .25), opacity=.75,
                                align='right')
 
     panel_label_control = build_label('Control', font_size=18,
                                       bold=True)
+    slider_label_volume = build_label('Volume')
     slider_label_opacity = build_label('Opacity')
 
-    control_panel.add_element(panel_label_control, (.02, .7))
-    control_panel.add_element(slider_label_opacity, (label_pad_x, .3))
+    control_panel.add_element(panel_label_control, (.02, .8))
+    control_panel.add_element(slider_label_volume, (label_pad_x, .55))
+    control_panel.add_element(slider_label_opacity, (label_pad_x, .2))
+
+    slider_slice_volume = ui.LineSlider2D(
+        initial_value=volume, max_value=num_volumes, length=length,
+        text_template='{value:.0f}')
 
     slider_slice_opacity = ui.LineSlider2D(
         initial_value=opacity, max_value=1, length=length,
         text_template=text_template)
 
+    slider_slice_volume.on_change = change_slice_volume
     slider_slice_opacity.on_change = change_slice_opacity
 
-    control_panel.add_element(slider_slice_opacity, (slice_pad_x, .3))
+    control_panel.add_element(slider_slice_volume, (slice_pad_x, .55))
+    control_panel.add_element(slider_slice_opacity, (slice_pad_x, .2))
 
     scene.add(control_panel)
 
