@@ -7,6 +7,7 @@ from fury.utils import (colors_from_actor, get_actor_from_polydata,
 from fury.shaders import add_shader_callback, load, shader_to_actor
 from nibabel.nifti1 import Nifti1Image
 from nilearn import surface
+from vtk.util import numpy_support
 
 
 import numpy as np
@@ -84,17 +85,20 @@ def change_slice_opacity(slider):
 
 
 def change_slice_volume(slider):
-    global fmri_affine, fmri_img, right_hemi_actor, right_pial_mesh, volume
+    global fmri_affine, fmri_img, right_hemi_actor, right_pial_mesh, show_m, \
+        volume
     volume = int(np.round(slider.value))
     fmri_nii = Nifti1Image(fmri_img[..., volume], fmri_affine)
-    right_colors = colors_from_actor(right_hemi_actor)
-    right_colors[:] = calculate_colors(fmri_nii, right_pial_mesh)
-    update_actor(right_hemi_actor)
+    right_vtk_colors = right_hemi_actor.GetMapper().GetInput().GetPointData().\
+        GetArray('colors')
+    right_colors = numpy_support.vtk_to_numpy(right_vtk_colors)
+    right_colors[:] = calculate_colors(fmri_nii, right_pial_mesh)[:]
+    right_vtk_colors.Modified()
 
 
 def calculate_colors(nifti, mesh, cmap='coolwarm'):
+    # TODO: Precompute textures
     texture = surface.vol_to_surf(nifti, mesh)
-    max_val = np.max(np.abs(texture))
     return colormap.create_colormap(texture, name=cmap) * 255
 
 
@@ -146,14 +150,14 @@ def win_callback(obj, event):
 
 if __name__ == '__main__':
     global control_panel, fmri_affine, fmri_img, ior_1, ior_2, pbr_panel, \
-        right_hemi_actor, right_pial_mesh, size, volume
+        right_hemi_actor, right_pial_mesh, show_m, size, volume
 
-    fmri_img, fmri_affine, fmri_nii = load_nifti(_MOTOR_FNAME, return_img=True)
-    #fmri_img, fmri_affine = load_nifti(_BOLD_FNAME)
+    #fmri_img, fmri_affine, fmri_nii = load_nifti(_MOTOR_FNAME, return_img=True)
+    fmri_img, fmri_affine = load_nifti(_BOLD_FNAME)
     img_shape = fmri_img.shape
     volume = 0
     num_volumes = img_shape[3] - 1 if len(img_shape) == 4 else 1
-    #fmri_nii = Nifti1Image(fmri_img[..., volume], fmri_affine)
+    fmri_nii = Nifti1Image(fmri_img[..., volume], fmri_affine)
 
     right_pial_mesh = surface.load_surf_mesh(_HEMI_DICT['right']['pial'])
 
