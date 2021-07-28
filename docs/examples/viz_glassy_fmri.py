@@ -86,30 +86,34 @@ def change_slice_opacity(slider):
 
 def change_slice_volume(slider):
     global right_hemi_actor, right_textures, volume
-    volume = int(np.round(slider.value))
-    fmri_nii = Nifti1Image(fmri_img[..., volume], fmri_affine)
-    right_vtk_colors = right_hemi_actor.GetMapper().GetInput().GetPointData().\
-        GetArray('colors')
-    right_colors = numpy_support.vtk_to_numpy(right_vtk_colors)
-    #right_colors[:] = calculate_colors(fmri_nii, right_pial_mesh)[:]
-    #right_vtk_colors.Modified()
+    val = int(np.round(slider.value))
+    if volume != val:
+        volume = val
+        right_vtk_colors = right_hemi_actor.GetMapper().GetInput().\
+            GetPointData().GetArray('colors')
+        right_colors = numpy_support.vtk_to_numpy(right_vtk_colors)
+        texture = right_textures[:, volume]
+        right_colors[:] = colors_from_texture(texture)[:]
+        right_vtk_colors.Modified()
 
 
-def colors_from_texture(texture, cmap='viridis'):
+def colors_from_texture(texture, cmap='coolwarm'):
     return colormap.create_colormap(texture, name=cmap) * 255
 
 
-def compute_textures(img, affine, mesh, num_volumes):
-    if num_volumes == 1:
-        nifti = Nifti1Image(img, affine)
-        return surface.vol_to_surf(nifti, mesh)[:, None]
-    else:
-        textures = np.empty((mesh[0].shape[0], num_volumes))
-        for i in range(num_volumes):
-            print('Computing texture N°{:2d}'.format(i + 1))
-            nifti = Nifti1Image(img[..., i], affine)
-            textures[:, i] = surface.vol_to_surf(nifti, mesh)
-        return textures
+def compute_textures(img, affine, mesh, volumes):
+    if type(volumes) == int:
+        if volumes == 1:
+            nifti = Nifti1Image(img, affine)
+            return surface.vol_to_surf(nifti, mesh)[:, None]
+        else:
+            volumes = np.arange(volumes)
+    textures = np.empty((mesh[0].shape[0], len(volumes)))
+    for idx, vol in enumerate(volumes):
+        print('Computing texture for volume N°{:4d}'.format(vol + 1))
+        nifti = Nifti1Image(img[..., vol], affine)
+        textures[:, idx] = surface.vol_to_surf(nifti, mesh)
+    return textures
 
 
 def get_cubemap(files_names):
@@ -170,9 +174,10 @@ if __name__ == '__main__':
     volume = 0
     #num_volumes = img_shape[3] if len(img_shape) == 4 else 1
     num_volumes = 10
+    volumes = np.rint(np.linspace(0, img_shape[3] - 1, num=10)).astype(int)
 
     right_textures = compute_textures(fmri_img, fmri_affine, right_pial_mesh,
-                                      num_volumes)
+                                      volumes)#num_volumes)
 
     right_colors = colors_from_texture(right_textures[:, volume])
 
