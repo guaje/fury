@@ -1,15 +1,17 @@
 from dipy.io.image import load_nifti
-from fury import actor, colormap, ui, window
+from fury import actor, ui, window
 from fury.data import read_viz_textures
-from fury.utils import (colors_from_actor, get_actor_from_polydata,
-                        set_polydata_colors, set_polydata_vertices,
-                        set_polydata_triangles, update_actor)
+from fury.utils import (get_actor_from_polydata, set_polydata_colors,
+                        set_polydata_vertices, set_polydata_triangles)
 from fury.shaders import add_shader_callback, load, shader_to_actor
+from matplotlib import cm
+from nibabel import gifti
 from nibabel.nifti1 import Nifti1Image
 from nilearn import surface
 from vtk.util import numpy_support
 
 
+import gzip
 import numpy as np
 import os
 import vtk
@@ -85,7 +87,7 @@ def change_slice_opacity(slider):
 
 
 def change_slice_volume(slider):
-    global right_hemi_actor, right_textures, volume
+    global right_hemi_actor, right_max_val, right_textures, volume
     val = int(np.round(slider.value))
     if volume != val:
         volume = val
@@ -93,12 +95,31 @@ def change_slice_volume(slider):
             GetPointData().GetArray('colors')
         right_colors = numpy_support.vtk_to_numpy(right_vtk_colors)
         texture = right_textures[:, volume]
-        right_colors[:] = colors_from_texture(texture)[:]
+        right_colors[:] = colors_from_texture(texture, right_max_val)[:]
         right_vtk_colors.Modified()
 
 
-def colors_from_texture(texture, cmap='coolwarm'):
-    return colormap.create_colormap(texture, name=cmap) * 255
+def colors_from_texture(texture, max_val, cmap='seismic', thr=None,
+                        bg_data=None, bg_cmap='gray_r'):
+    color_cmap = cm.get_cmap(cmap)
+    colors = np.empty((texture.shape[0], 3))
+    if thr is not None and bg_data is not None:
+        bg_cmap = cm.get_cmap(bg_cmap)
+        bg_min = np.min(bg_data)
+        bg_max = np.max(bg_data)
+        bg_diff = bg_max - bg_min
+    for i in range(texture.shape[0]):
+        if thr is not None and bg_data is not None:
+            if -thr <= texture[i] <= thr:
+                # Normalize background data between [0, 1]
+                val = (bg_data[i] - bg_min) / bg_diff
+                colors[i] = np.array(bg_cmap(val))[:3]
+                continue
+        # Normalize values between [0, 1]
+        val = (texture[i] + max_val) / (2 * max_val)
+        colors[i] = np.array(color_cmap(val))[:3]
+    colors *= 255
+    return colors
 
 
 def compute_textures(img, affine, mesh, volumes):
@@ -108,9 +129,11 @@ def compute_textures(img, affine, mesh, volumes):
             return surface.vol_to_surf(nifti, mesh)[:, None]
         else:
             volumes = np.arange(volumes)
+    num_vols = len(volumes)
     textures = np.empty((mesh[0].shape[0], len(volumes)))
     for idx, vol in enumerate(volumes):
-        print('Computing texture for volume N°{:4d}'.format(vol + 1))
+        print('Computing texture for volume ({:02d}/{}): {:4d}'.format(
+            idx + 1, num_vols, vol + 1))
         nifti = Nifti1Image(img[..., vol], affine)
         textures[:, idx] = surface.vol_to_surf(nifti, mesh)
     return textures
@@ -145,6 +168,15 @@ def get_hemisphere_actor(fname, colors=None):
     return get_actor_from_polydata(polydata)
 
 
+def points_from_gzipped_gifti(fname):
+    with gzip.open(fname) as f:
+        as_bytes = f.read()
+    parser = gifti.GiftiImage.parser()
+    parser.parse(as_bytes)
+    gifti_img = parser.img
+    return gifti_img.darrays[0].data
+
+
 def uniforms_callback(_caller, _event, calldata=None):
     global ior_1, ior_2
     if calldata is not None:
@@ -164,22 +196,27 @@ def win_callback(obj, event):
 
 if __name__ == '__main__':
     global control_panel, ior_1, ior_2, pbr_panel, right_hemi_actor, \
-        right_textures, size, volume
+        right_max_val, right_textures, size, volume
 
     right_pial_mesh = surface.load_surf_mesh(_HEMI_DICT['right']['pial'])
+    #right_sulc_mesh = surface.load_surf_mesh(_HEMI_DICT['right']['sulc'])
+    right_sulc_points = points_from_gzipped_gifti(_HEMI_DICT['right']['sulc'])
 
-    #fmri_img, fmri_affine = load_nifti(_MOTOR_FNAME)
-    fmri_img, fmri_affine = load_nifti(_BOLD_FNAME)
+    fmri_img, fmri_affine = load_nifti(_MOTOR_FNAME)
+    #fmri_img, fmri_affine = load_nifti(_BOLD_FNAME)
     img_shape = fmri_img.shape
     volume = 0
-    #num_volumes = img_shape[3] if len(img_shape) == 4 else 1
-    num_volumes = 10
-    volumes = np.rint(np.linspace(0, img_shape[3] - 1, num=10)).astype(int)
+    num_volumes = img_shape[3] if len(img_shape) == 4 else 1
+    #num_volumes = 10
+    #volumes = np.rint(np.linspace(0, img_shape[3] - 1, num=10)).astype(int)
 
     right_textures = compute_textures(fmri_img, fmri_affine, right_pial_mesh,
-                                      volumes)#num_volumes)
+                                      num_volumes)
+    right_max_val = np.max(np.abs(right_textures))
 
-    right_colors = colors_from_texture(right_textures[:, volume])
+    right_colors = colors_from_texture(
+        right_textures[:, volume], right_max_val, thr=1,
+        bg_data=right_sulc_points)
 
     right_hemi_actor = get_hemisphere_actor(_HEMI_DICT['right']['infl'],
                                             colors=right_colors)
@@ -246,6 +283,14 @@ if __name__ == '__main__':
 
     scene.add(right_hemi_actor)
     scene.add(skybox_actor)
+
+    view = 'right lateral'
+    if view == 'right lateral':
+        scene.roll(-90)
+        scene.pitch(85)
+
+    scene.reset_camera()
+    scene.reset_clipping_range()
 
     #window.show(scene)
 
