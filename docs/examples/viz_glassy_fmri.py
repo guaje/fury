@@ -7,7 +7,7 @@ from fury.shaders import add_shader_callback, load, shader_to_actor
 from matplotlib import cm
 from nibabel import gifti
 from nibabel.nifti1 import Nifti1Image
-from nilearn import surface
+from nilearn import datasets, surface
 from vtk.util import numpy_support
 
 
@@ -15,29 +15,6 @@ import gzip
 import numpy as np
 import os
 import vtk
-
-
-_FSAVG_DIR = '/run/media/guaje/Data/Data/repo_files/fsaverage/fsaverage/'
-_NEUROVAULT_DIR = '/run/media/guaje/Data/Data/repo_files/pipelines/fMRI/' \
-                  'NeuroVault-10426/'
-_HAXBY_DIR = '/run/media/guaje/Data/Data/repo_files/Haxby_2001/subj2/'
-
-_MOTOR_FNAME = os.path.join(_NEUROVAULT_DIR,
-                            'task001_left_vs_right_motor.nii.gz')
-
-_BOLD_FNAME = os.path.join(_HAXBY_DIR, 'bold.nii.gz')
-
-_HEMI_DICT = {
-    'left': {
-        'infl': os.path.join(_FSAVG_DIR, 'infl_left.gii.gz'),
-        'pial': os.path.join(_FSAVG_DIR, 'pial_left.gii.gz'),
-        'sulc': os.path.join(_FSAVG_DIR, 'sulc_left.gii.gz')
-    },
-    'right': {
-        'infl': os.path.join(_FSAVG_DIR, 'infl_right.gii.gz'),
-        'pial': os.path.join(_FSAVG_DIR, 'pial_right.gii.gz'),
-        'sulc': os.path.join(_FSAVG_DIR, 'sulc_right.gii.gz')
-    }}
 
 
 def build_label(text, font_size=16, color=(1, 1, 1), bold=False, italic=False,
@@ -198,11 +175,13 @@ if __name__ == '__main__':
     global control_panel, ior_1, ior_2, pbr_panel, right_hemi_actor, \
         right_max_val, right_textures, size, volume
 
-    right_pial_mesh = surface.load_surf_mesh(_HEMI_DICT['right']['pial'])
-    #right_sulc_mesh = surface.load_surf_mesh(_HEMI_DICT['right']['sulc'])
-    right_sulc_points = points_from_gzipped_gifti(_HEMI_DICT['right']['sulc'])
+    fsaverage = datasets.fetch_surf_fsaverage(mesh='fsaverage')
+    motor_imgs = datasets.fetch_neurovault_motor_task()
 
-    fmri_img, fmri_affine = load_nifti(_MOTOR_FNAME)
+    right_pial_mesh = surface.load_surf_mesh(fsaverage.pial_right)
+    right_sulc_points = points_from_gzipped_gifti(fsaverage.sulc_right)
+
+    fmri_img, fmri_affine = load_nifti(motor_imgs.images[0])
     #fmri_img, fmri_affine = load_nifti(_BOLD_FNAME)
     img_shape = fmri_img.shape
     volume = 0
@@ -218,7 +197,7 @@ if __name__ == '__main__':
         right_textures[:, volume], right_max_val, thr=1,
         bg_data=right_sulc_points)
 
-    right_hemi_actor = get_hemisphere_actor(_HEMI_DICT['right']['infl'],
+    right_hemi_actor = get_hemisphere_actor(fsaverage.infl_right,
                                             colors=right_colors)
 
     ior_1 = 1.  # Air
@@ -254,12 +233,12 @@ if __name__ == '__main__':
     shader_to_actor(right_hemi_actor, 'fragment', impl_code=fs_impl_code,
                     block='light')
 
-    cubemap_fns = [read_viz_textures('waterfall-skybox-px.jpg'),
-                   read_viz_textures('waterfall-skybox-nx.jpg'),
-                   read_viz_textures('waterfall-skybox-py.jpg'),
-                   read_viz_textures('waterfall-skybox-ny.jpg'),
-                   read_viz_textures('waterfall-skybox-pz.jpg'),
-                   read_viz_textures('waterfall-skybox-nz.jpg')]
+    cubemap_fns = [read_viz_textures('skybox-px.jpg'),
+                   read_viz_textures('skybox-nx.jpg'),
+                   read_viz_textures('skybox-py.jpg'),
+                   read_viz_textures('skybox-ny.jpg'),
+                   read_viz_textures('skybox-pz.jpg'),
+                   read_viz_textures('skybox-nz.jpg')]
 
     # Load the cube map
     cubemap = get_cubemap(cubemap_fns)
@@ -283,6 +262,7 @@ if __name__ == '__main__':
 
     scene.add(right_hemi_actor)
     scene.add(skybox_actor)
+    scene.background((1, 1, 1))
 
     view = 'right lateral'
     if view == 'right lateral':
