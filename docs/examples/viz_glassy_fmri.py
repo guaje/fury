@@ -177,12 +177,13 @@ if __name__ == '__main__':
 
     fsaverage = datasets.fetch_surf_fsaverage(mesh='fsaverage')
     motor_imgs = datasets.fetch_neurovault_motor_task()
+    haxby_dataset = datasets.fetch_haxby()
 
     right_pial_mesh = surface.load_surf_mesh(fsaverage.pial_right)
     right_sulc_points = points_from_gzipped_gifti(fsaverage.sulc_right)
 
     fmri_img, fmri_affine = load_nifti(motor_imgs.images[0])
-    #fmri_img, fmri_affine = load_nifti(_BOLD_FNAME)
+    #fmri_img, fmri_affine = load_nifti(haxby_dataset.func[0])
     img_shape = fmri_img.shape
     volume = 0
     num_volumes = img_shape[3] if len(img_shape) == 4 else 1
