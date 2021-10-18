@@ -247,7 +247,8 @@ def load_polydata(file_name):
     return reader.GetOutput()
 
 
-def save_polydata(polydata, file_name, binary=False, color_array_name=None):
+def save_polydata(polydata, file_name, binary=False, color_array_name=None,
+                  save_all_arrays=True):
     """Save a vtk polydata to a supported format file.
 
     Save formats can be VTK, FIB, PLY, STL and XML.
@@ -284,6 +285,18 @@ def save_polydata(polydata, file_name, binary=False, color_array_name=None):
 
     writer.SetFileName(file_name)
     writer = set_input(writer, polydata)
+    """
+    if save_all_arrays and file_extension == "ply":
+        point_data = polydata.GetPointData()
+        num_arrays = point_data.GetNumberOfArrays()
+        for i in range(num_arrays):
+            arr_name = point_data.GetArrayName(i)
+            # TODO: Check VTK_UNSIGNED_CHAR
+            arr_type = point_data.GetArray(i).GetDataType()
+            # TODO: Compare against number of components/vertices
+            arr_num_comps = point_data.GetArray(i).GetNumberOfTuples()
+    """
+
     if color_array_name is not None and file_extension == "ply":
         writer.SetArrayName(color_array_name)
 
