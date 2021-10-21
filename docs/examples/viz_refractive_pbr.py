@@ -1,8 +1,9 @@
 from dipy.data import get_fnames
 from fury import actor, ui, window
-from fury.data import read_viz_textures
+from fury.data import fetch_viz_models, read_viz_models, read_viz_textures
 from fury.io import load_polydata
-from fury.utils import get_actor_from_polydata
+from fury.utils import (get_actor_from_polydata, get_polydata_colors,
+                        get_polydata_vertices, set_polydata_colors)
 from fury.shaders import add_shader_callback, load, shader_to_actor
 from scipy.spatial import Delaunay
 
@@ -32,32 +33,32 @@ def build_label(text, font_size=16, color=(1, 1, 1), bold=False, italic=False,
 
 def change_slice_ao_strength(slider):
     global obj_actor
-    obj_actor.GetProperty().SetOcclusionStrength(slider._value)
+    obj_actor.GetProperty().SetOcclusionStrength(slider.value)
 
 
 def change_slice_ior_1(slider):
     global ior_1
-    ior_1 = slider._value
+    ior_1 = slider.value
 
 
 def change_slice_ior_2(slider):
     global ior_2
-    ior_2 = slider._value
+    ior_2 = slider.value
 
 
 def change_slice_metallic(slider):
     global obj_actor
-    obj_actor.GetProperty().SetMetallic(slider._value)
+    obj_actor.GetProperty().SetMetallic(slider.value)
 
 
 def change_slice_roughness(slider):
     global obj_actor
-    obj_actor.GetProperty().SetRoughness(slider._value)
+    obj_actor.GetProperty().SetRoughness(slider.value)
 
 
 def change_slice_opacity(slider):
     global obj_actor
-    obj_actor.GetProperty().SetOpacity(slider._value)
+    obj_actor.GetProperty().SetOpacity(slider.value)
 
 
 def get_cubemap(files_names):
@@ -83,6 +84,26 @@ def get_cubemap(files_names):
 def obj_brain():
     brain_lh = get_fnames(name='fury_surface')
     polydata = load_polydata(brain_lh)
+    return get_actor_from_polydata(polydata)
+
+
+def obj_model(model='glyptotek.vtk', color=None):
+    if model != 'glyptotek.vtk':
+        fetch_viz_models()
+    model = read_viz_models(model)
+    polydata = load_polydata(model)
+    if color is not None:
+        color = np.asarray([color]) * 255
+        colors = get_polydata_colors(polydata)
+        if colors is not None:
+            num_vertices = colors.shape[0]
+            new_colors = np.repeat(color, num_vertices, axis=0)
+            colors[:, :] = new_colors
+        else:
+            vertices = get_polydata_vertices(polydata)
+            num_vertices = vertices.shape[0]
+            new_colors = np.repeat(color, num_vertices, axis=0)
+            set_polydata_colors(polydata, new_colors)
     return get_actor_from_polydata(polydata)
 
 
@@ -139,18 +160,22 @@ def win_callback(obj, event):
 if __name__ == '__main__':
     global control_panel, ior_1, ior_2, obj_actor, pbr_panel, size
 
+    scene = window.Scene()
+
+    scene.roll(-145)
+    scene.pitch(70)
+
     #obj_actor = obj_brain()
     #obj_actor = obj_surface()
-    obj_actor = obj_spheres()
+    #obj_actor = obj_model(model='suzanne.obj', color=(0, 1, 1))
+    #obj_actor = obj_model(model='glyptotek.vtk', color=(0, 1, 1))
+    obj_actor = obj_model(model='glyptotek.vtk')
+    #obj_actor = obj_spheres()
 
-    #ambient = obj_actor.GetProperty().GetAmbient()
-    #ambient_color = obj_actor.GetProperty().GetAmbientColor()
-    #diffuse = obj_actor.GetProperty().GetDiffuse()
-    #diffuseColor = obj_actor.GetProperty().GetDiffuseColor()
-    #specular = obj_actor.GetProperty().GetSpecular()
-    #specular_power = obj_actor.GetProperty().GetSpecularPower()
-    #specular_color = obj_actor.GetProperty().GetSpecularColor()
-    #specular_color = vtk.vtkNamedColors().GetColor3d('White')
+    scene.add(obj_actor)
+
+    scene.reset_camera()
+    scene.zoom(1.3)
 
     ior_1 = 1.  # Air
     #ior_1 = 1.333  # Water(20 °C)
@@ -180,7 +205,6 @@ if __name__ == '__main__':
     fs_impl_code = load('refractive_impl.frag')
 
     #shader_to_actor(obj_actor, 'vertex', debug=True)
-    #shader_to_actor(obj_actor, 'fragment', debug=True)
     shader_to_actor(obj_actor, 'fragment', decl_code=fs_dec_code)
     shader_to_actor(obj_actor, 'fragment', impl_code=fs_impl_code,
                     block='light')
@@ -204,15 +228,12 @@ if __name__ == '__main__':
     skybox_actor = vtk.vtkSkybox()
     skybox_actor.SetTexture(skybox)
 
-    scene = window.Scene()
-
     scene.UseImageBasedLightingOn()
     if vtk.vtkVersion.GetVTKMajorVersion() >= 9:
         scene.SetEnvironmentTexture(cubemap)
     else:
         scene.SetEnvironmentCubeMap(cubemap)
 
-    scene.add(obj_actor)
     scene.add(skybox_actor)
 
     #window.show(scene)
