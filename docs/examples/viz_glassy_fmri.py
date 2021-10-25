@@ -1,7 +1,7 @@
 from dipy.io.image import load_nifti
 from fury import actor, ui, window
 from fury.data import read_viz_textures
-from fury.utils import (get_actor_from_polydata, set_polydata_colors,
+from fury.utils import (get_actor_from_polydata, rotate, set_polydata_colors,
                         set_polydata_vertices, set_polydata_triangles)
 from fury.shaders import add_shader_callback, load, shader_to_actor
 from matplotlib import cm
@@ -116,15 +116,19 @@ def compute_textures(img, affine, mesh, volumes):
     return textures
 
 
-def get_cubemap_from_ndarrays(array):
+def get_cubemap_from_ndarrays(array, flip=True):
     texture = vtk.vtkTexture()
     texture.CubeMapOn()
     for idx, img in enumerate(array):
         vtk_img = vtk.vtkImageData()
         vtk_img.SetDimensions(img.shape[1], img.shape[0], 1)
-        #vtk_arr = numpy_support.numpy_to_vtk(img)
-        vtk_arr = numpy_support.numpy_to_vtk(np.flip(
-            img.swapaxes(0, 1), axis=1).reshape((-1, 3), order='F'))
+        if flip:
+            # Flip horizontally
+            vtk_arr = numpy_support.numpy_to_vtk(np.flip(
+                img.swapaxes(0, 1), axis=1).reshape((-1, 3), order='F'))
+        else:
+            vtk_arr = numpy_support.numpy_to_vtk(img.reshape((-1, 3),
+                                                             order='F'))
         vtk_arr.SetName('Image')
         vtk_img.GetPointData().AddArray(vtk_arr)
         vtk_img.GetPointData().SetActiveScalars('Image')
@@ -198,17 +202,19 @@ if __name__ == '__main__':
     right_pial_mesh = surface.load_surf_mesh(fsaverage.pial_right)
     right_sulc_points = points_from_gzipped_gifti(fsaverage.sulc_right)
 
-    #fmri_img, fmri_affine = load_nifti(motor_imgs.images[0])
-    fmri_img, fmri_affine = load_nifti(haxby_dataset.func[0])
+    fmri_img, fmri_affine = load_nifti(motor_imgs.images[0])
+    #fmri_img, fmri_affine = load_nifti(haxby_dataset.func[0])
     img_shape = fmri_img.shape
     volume = 0
-    #num_volumes = img_shape[3] if len(img_shape) == 4 else 1
-    num_volumes = 10
+    num_volumes = img_shape[3] if len(img_shape) == 4 else 1
+    #num_volumes = 10
+    """
     volumes = np.rint(np.linspace(0, img_shape[3] - 1,
                                   num=num_volumes)).astype(int)
+    """
 
     right_textures = compute_textures(fmri_img, fmri_affine, right_pial_mesh,
-                                      volumes)
+                                      num_volumes)
     right_max_val = np.max(np.abs(right_textures))
 
     right_colors = colors_from_texture(
@@ -252,13 +258,14 @@ if __name__ == '__main__':
                     block='light')
 
     """
-    cubemap_fns = [read_viz_textures('skybox-px.jpg'),
-                   read_viz_textures('skybox-nx.jpg'),
-                   read_viz_textures('skybox-py.jpg'),
-                   read_viz_textures('skybox-ny.jpg'),
-                   read_viz_textures('skybox-pz.jpg'),
-                   read_viz_textures('skybox-nz.jpg')]
-
+    #texture_name = 'skybox'
+    texture_name = 'brudslojan'
+    cubemap_fns = [read_viz_textures(texture_name + '-px.jpg'),
+                   read_viz_textures(texture_name + '-nx.jpg'),
+                   read_viz_textures(texture_name + '-py.jpg'),
+                   read_viz_textures(texture_name + '-ny.jpg'),
+                   read_viz_textures(texture_name + '-pz.jpg'),
+                   read_viz_textures(texture_name + '-nz.jpg')]
     # Load the cube map
     cubemap = get_cubemap(cubemap_fns)
     """
@@ -271,7 +278,7 @@ if __name__ == '__main__':
     """
 
     # NOTE: Test px, nx, py, ny, pz, nz
-    img_shape = (512, 512)
+    img_shape = (1024, 1024)
     #img_255s = 255 * np.ones(img_shape).astype(np.uint8)
 
     """
@@ -281,9 +288,9 @@ if __name__ == '__main__':
     cubemap_blue_img = np.stack((img_zeros, img_zeros, img_255s), axis=-1)
     """
 
-    # NOTE: Test gradient orientation texture
-    img_grad = np.tile(np.linspace(0, 255, num=img_shape[0]),
-                       (img_shape[1], 1)).astype(np.uint8)
+    # Flip horizontally
+    img_grad = np.flip(np.tile(np.linspace(0, 255, num=img_shape[0]),
+                               (img_shape[1], 1)).astype(np.uint8), axis=1)
 
     """
     cubemap_red_img = np.stack((img_255s, img_grad, img_grad), axis=-1)
@@ -291,11 +298,16 @@ if __name__ == '__main__':
     cubemap_blue_img = np.stack((img_grad, img_grad, img_255s), axis=-1)
     """
 
-    # NOTE: Grayscale gradient
-    cubemap_img = np.stack((img_grad,) * 3, axis=-1)
+    cubemap_side_img = np.stack((img_grad,) * 3, axis=-1)
 
-    cubemap_imgs = [cubemap_img, cubemap_img, cubemap_img, cubemap_img,
-                    cubemap_img, cubemap_img]
+    cubemap_top_img = np.ones((img_shape[0], img_shape[1], 3)).astype(
+        np.uint8) * 255
+
+    cubemap_bottom_img = np.zeros((img_shape[0], img_shape[1], 3)).astype(
+        np.uint8)
+
+    cubemap_imgs = [cubemap_side_img, cubemap_side_img, cubemap_top_img,
+                    cubemap_bottom_img, cubemap_side_img, cubemap_side_img]
 
     """
     cubemap_imgs = [cubemap_red_img, cubemap_red_img, cubemap_green_img,
@@ -316,7 +328,7 @@ if __name__ == '__main__':
                     checkerboard_img, checkerboard_img, checkerboard_img]
     """
 
-    cubemap = get_cubemap_from_ndarrays(cubemap_imgs)
+    cubemap = get_cubemap_from_ndarrays(cubemap_imgs, flip=False)
 
     # Load the skybox
     skybox = cubemap
@@ -336,13 +348,20 @@ if __name__ == '__main__':
         scene.SetEnvironmentCubeMap(cubemap)
 
     scene.add(right_hemi_actor)
-    #scene.add(skybox_actor)
-    #scene.background((1, 1, 1))
 
     view = 'right lateral'
     if view == 'right lateral':
+        rotate(right_hemi_actor, rotation=(-90, 0, 0, 1))
+        rotate(right_hemi_actor, rotation=(-90, 1, 0, 0))
+
+    scene.add(skybox_actor)
+    #scene.background((1, 1, 1))
+
+    """
+    if view == 'right lateral':
         scene.roll(-90)
         scene.pitch(87)
+    """
 
     scene.reset_camera()
     scene.reset_clipping_range()

@@ -3,9 +3,10 @@ from fury import actor, ui, window
 from fury.data import fetch_viz_models, read_viz_models, read_viz_textures
 from fury.io import load_polydata
 from fury.utils import (get_actor_from_polydata, get_polydata_colors,
-                        get_polydata_vertices, set_polydata_colors)
+                        get_polydata_vertices, rotate, set_polydata_colors)
 from fury.shaders import add_shader_callback, load, shader_to_actor
 from scipy.spatial import Delaunay
+from vtk.util import numpy_support
 
 
 import math
@@ -59,6 +60,26 @@ def change_slice_roughness(slider):
 def change_slice_opacity(slider):
     global obj_actor
     obj_actor.GetProperty().SetOpacity(slider.value)
+
+
+def get_cubemap_from_ndarrays(array, flip=True):
+    texture = vtk.vtkTexture()
+    texture.CubeMapOn()
+    for idx, img in enumerate(array):
+        vtk_img = vtk.vtkImageData()
+        vtk_img.SetDimensions(img.shape[1], img.shape[0], 1)
+        if flip:
+            # Flip horizontally
+            vtk_arr = numpy_support.numpy_to_vtk(np.flip(
+                img.swapaxes(0, 1), axis=1).reshape((-1, 3), order='F'))
+        else:
+            vtk_arr = numpy_support.numpy_to_vtk(img.reshape((-1, 3),
+                                                             order='F'))
+        vtk_arr.SetName('Image')
+        vtk_img.GetPointData().AddArray(vtk_arr)
+        vtk_img.GetPointData().SetActiveScalars('Image')
+        texture.SetInputDataObject(idx, vtk_img)
+    return texture
 
 
 def get_cubemap(files_names):
@@ -162,8 +183,11 @@ if __name__ == '__main__':
 
     scene = window.Scene()
 
-    scene.roll(-145)
-    scene.pitch(70)
+    #scene.roll(-145)
+    #scene.pitch(70)
+
+    # Scene rotation only. For specific skybox only.
+    scene.yaw(-110)
 
     #obj_actor = obj_brain()
     #obj_actor = obj_surface()
@@ -171,6 +195,11 @@ if __name__ == '__main__':
     #obj_actor = obj_model(model='glyptotek.vtk', color=(0, 1, 1))
     obj_actor = obj_model(model='glyptotek.vtk')
     #obj_actor = obj_spheres()
+
+    rotate(obj_actor, rotation=(-145, 0, 0, 1))
+    rotate(obj_actor, rotation=(-70, 1, 0, 0))
+
+    rotate(obj_actor, rotation=(-110, 0, 1, 0))
 
     scene.add(obj_actor)
 
@@ -209,18 +238,39 @@ if __name__ == '__main__':
     shader_to_actor(obj_actor, 'fragment', impl_code=fs_impl_code,
                     block='light')
 
-    cubemap_fns = [read_viz_textures('skybox-px.jpg'),
-                   read_viz_textures('skybox-nx.jpg'),
-                   read_viz_textures('skybox-py.jpg'),
-                   read_viz_textures('skybox-ny.jpg'),
-                   read_viz_textures('skybox-pz.jpg'),
-                   read_viz_textures('skybox-nz.jpg')]
-
+    #texture_name = 'skybox'
+    texture_name = 'brudslojan'
+    cubemap_fns = [read_viz_textures(texture_name + '-px.jpg'),
+                   read_viz_textures(texture_name + '-nx.jpg'),
+                   read_viz_textures(texture_name + '-py.jpg'),
+                   read_viz_textures(texture_name + '-ny.jpg'),
+                   read_viz_textures(texture_name + '-pz.jpg'),
+                   read_viz_textures(texture_name + '-nz.jpg')]
     # Load the cube map
     cubemap = get_cubemap(cubemap_fns)
 
+    """
+    img_shape = (1024, 1024)
+
+    # Flip horizontally
+    img_grad = np.flip(np.tile(np.linspace(0, 255, num=img_shape[0]),
+                               (img_shape[1], 1)).astype(np.uint8), axis=1)
+    cubemap_side_img = np.stack((img_grad,) * 3, axis=-1)
+
+    cubemap_top_img = np.ones((img_shape[0], img_shape[1], 3)).astype(
+        np.uint8) * 255
+
+    cubemap_bottom_img = np.zeros((img_shape[0], img_shape[1], 3)).astype(
+        np.uint8)
+
+    cubemap_imgs = [cubemap_side_img, cubemap_side_img, cubemap_top_img,
+                    cubemap_bottom_img, cubemap_side_img, cubemap_side_img]
+
+    cubemap = get_cubemap_from_ndarrays(cubemap_imgs, flip=False)
+    """
+
     # Load the skybox
-    skybox = get_cubemap(cubemap_fns)
+    skybox = cubemap
     skybox.InterpolateOn()
     skybox.RepeatOff()
     skybox.EdgeClampOn()
