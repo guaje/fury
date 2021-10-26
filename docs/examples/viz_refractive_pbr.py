@@ -187,7 +187,7 @@ if __name__ == '__main__':
     #scene.pitch(70)
 
     # Scene rotation only. For specific skybox only.
-    scene.yaw(-110)
+    #scene.yaw(-110)
 
     #obj_actor = obj_brain()
     #obj_actor = obj_surface()
@@ -199,12 +199,12 @@ if __name__ == '__main__':
     rotate(obj_actor, rotation=(-145, 0, 0, 1))
     rotate(obj_actor, rotation=(-70, 1, 0, 0))
 
-    rotate(obj_actor, rotation=(-110, 0, 1, 0))
+    #rotate(obj_actor, rotation=(-110, 0, 1, 0))
 
     scene.add(obj_actor)
 
     scene.reset_camera()
-    scene.zoom(1.3)
+    scene.zoom(1.9)
 
     ior_1 = 1.  # Air
     #ior_1 = 1.333  # Water(20 °C)
