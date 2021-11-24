@@ -214,14 +214,12 @@ if __name__ == '__main__':
     #ior_2 = 1.  # Air
     #ior_2 = 2.33  # Platinum
 
+    # TODO: Manual handling of PBR
     obj_actor.GetProperty().SetInterpolationToPBR()
-    #metallic = .0
-    metallic = obj_actor.GetProperty().GetMetallic()
+    metallic = .0
     roughness = .0
-    #roughness = obj_actor.GetProperty().GetRoughness()
     emissive_factor = obj_actor.GetProperty().GetEmissiveFactor()
     ao_strength = obj_actor.GetProperty().GetOcclusionStrength()
-
     obj_actor.GetProperty().SetMetallic(metallic)
     obj_actor.GetProperty().SetRoughness(roughness)
 
@@ -234,6 +232,7 @@ if __name__ == '__main__':
     fs_impl_code = load('refractive_impl.frag')
 
     #shader_to_actor(obj_actor, 'vertex', debug=True)
+    #shader_to_actor(obj_actor, 'fragment', debug=True)
     shader_to_actor(obj_actor, 'fragment', decl_code=fs_dec_code)
     shader_to_actor(obj_actor, 'fragment', impl_code=fs_impl_code,
                     block='light')

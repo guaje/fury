@@ -8,6 +8,8 @@ from matplotlib import cm
 from nibabel import gifti
 from nibabel.nifti1 import Nifti1Image
 from nilearn import datasets, surface
+from nilearn.image import index_img
+import pandas as pd
 from vtk.util import numpy_support
 
 
@@ -99,11 +101,11 @@ def colors_from_texture(texture, max_val, cmap='seismic', thr=None,
     return colors
 
 
-def compute_textures(img, affine, mesh, volumes):
+def compute_textures(img, affine, mesh, volumes, radius=3):
     if type(volumes) == int:
         if volumes == 1:
             nifti = Nifti1Image(img, affine)
-            return surface.vol_to_surf(nifti, mesh)[:, None]
+            return surface.vol_to_surf(nifti, mesh, radius=radius)[:, None]
         else:
             volumes = np.arange(volumes)
     num_vols = len(volumes)
@@ -112,7 +114,7 @@ def compute_textures(img, affine, mesh, volumes):
         print('Computing texture for volume ({:02d}/{}): {:4d}'.format(
             idx + 1, num_vols, vol + 1))
         nifti = Nifti1Image(img[..., vol], affine)
-        textures[:, idx] = surface.vol_to_surf(nifti, mesh)
+        textures[:, idx] = surface.vol_to_surf(nifti, mesh, radius=radius)
     return textures
 
 
@@ -195,34 +197,75 @@ if __name__ == '__main__':
     global control_panel, ior_1, ior_2, pbr_panel, right_hemi_actor, \
         right_max_val, right_textures, size, volume
 
+    scene = window.Scene()
+
     fsaverage = datasets.fetch_surf_fsaverage(mesh='fsaverage')
-    motor_imgs = datasets.fetch_neurovault_motor_task()
+    #motor_imgs = datasets.fetch_neurovault_motor_task()
     haxby_dataset = datasets.fetch_haxby()
 
     right_pial_mesh = surface.load_surf_mesh(fsaverage.pial_right)
+    #right_infl_mesh = surface.load_surf_mesh(fsaverage.infl_right)
     right_sulc_points = points_from_gzipped_gifti(fsaverage.sulc_right)
 
-    fmri_img, fmri_affine = load_nifti(motor_imgs.images[0])
-    #fmri_img, fmri_affine = load_nifti(haxby_dataset.func[0])
+    #fmri_img, fmri_affine = load_nifti(motor_imgs.images[0])
+
+    labels = pd.read_csv(haxby_dataset.session_target[0], sep=' ')
+    condition_mask_face = labels['labels'] == 'face'
+    condition_mask_house = labels['labels'] == 'house'
+    nifti_img_face = index_img(haxby_dataset.func[0], condition_mask_face)
+    nifti_img_house = index_img(haxby_dataset.func[0], condition_mask_house)
+    fmri_affine = nifti_img_face.affine
+    fmri_img_face = np.asanyarray(nifti_img_face.dataobj)
+    fmri_img_house = np.asanyarray(nifti_img_house.dataobj)
+    fmri_img_face_max = np.max(fmri_img_face)
+    fmri_img_house_max = np.max(fmri_img_house)
+    fmri_img_max = np.max([fmri_img_face_max, fmri_img_house_max])
+    fmri_img_face = fmri_img_face / fmri_img_max
+    fmri_img_house = fmri_img_house / fmri_img_max
+    fmri_img = fmri_img_face - fmri_img_house
+
     img_shape = fmri_img.shape
     volume = 0
     num_volumes = img_shape[3] if len(img_shape) == 4 else 1
-    #num_volumes = 10
-    """
+    num_volumes = 10
+    #num_volumes = 1
+
+    # NOTE: Evenly spaced N volumes
     volumes = np.rint(np.linspace(0, img_shape[3] - 1,
                                   num=num_volumes)).astype(int)
-    """
 
     right_textures = compute_textures(fmri_img, fmri_affine, right_pial_mesh,
-                                      num_volumes)
-    right_max_val = np.max(np.abs(right_textures))
+                                      #num_volumes)
+                                      volumes)
 
+    """
+    from nilearn.plotting import plot_surf_stat_map
+    import matplotlib.pyplot as plt
+    #plot_surf_stat_map(fsaverage.infl_right, right_textures,
+    plot_surf_stat_map(fsaverage.infl_right, right_textures[:, 9],
+                       #hemi='right', colorbar=True, threshold=1,
+                       hemi='right', colorbar=True, threshold=.01,
+                       cmap='seismic', bg_map=fsaverage.sulc_right)
+    plt.show()
+    """
+
+    right_max_val = np.max(np.abs(right_textures))
+    #right_max_val = np.max(np.abs(scores))
+
+    # TODO: Pre-compute colors for each texture
     right_colors = colors_from_texture(
-        right_textures[:, volume], right_max_val, thr=1,
+        #right_textures[:, volume], right_max_val, thr=1,
+        right_textures[:, volume], right_max_val, thr=.01,
         bg_data=right_sulc_points)
+        #scores - chance, right_max_val, thr=.1, bg_data=right_sulc_points)
 
     right_hemi_actor = get_hemisphere_actor(fsaverage.infl_right,
                                             colors=right_colors)
+
+    view = 'right lateral'
+    if view == 'right lateral':
+        rotate(right_hemi_actor, rotation=(-90, 0, 0, 1))
+        rotate(right_hemi_actor, rotation=(-80, 1, 0, 0))
 
     ior_1 = 1.  # Air
     # ior_1 = 1.333  # Water(20 °C)
@@ -233,10 +276,8 @@ if __name__ == '__main__':
     # ior_2 = 2.33  # Platinum
 
     right_hemi_actor.GetProperty().SetInterpolationToPBR()
-    #metallic = .0
-    metallic = right_hemi_actor.GetProperty().GetMetallic()
+    metallic = .0
     roughness = .0
-    #roughness = right_surf_actor.GetProperty().GetRoughness()
     emissive_factor = right_hemi_actor.GetProperty().GetEmissiveFactor()
     ao_strength = right_hemi_actor.GetProperty().GetOcclusionStrength()
 
@@ -257,7 +298,6 @@ if __name__ == '__main__':
     shader_to_actor(right_hemi_actor, 'fragment', impl_code=fs_impl_code,
                     block='light')
 
-    """
     #texture_name = 'skybox'
     texture_name = 'brudslojan'
     cubemap_fns = [read_viz_textures(texture_name + '-px.jpg'),
@@ -268,7 +308,6 @@ if __name__ == '__main__':
                    read_viz_textures(texture_name + '-nz.jpg')]
     # Load the cube map
     cubemap = get_cubemap(cubemap_fns)
-    """
 
     """
     # NOTE: Test ndarray texture to cubemap
@@ -289,8 +328,10 @@ if __name__ == '__main__':
     """
 
     # Flip horizontally
-    img_grad = np.flip(np.tile(np.linspace(0, 255, num=img_shape[0]),
-                               (img_shape[1], 1)).astype(np.uint8), axis=1)
+    #img_grad = np.flip(np.tile(np.linspace(0, 255, num=img_shape[0]),
+    #                           (img_shape[1], 1)).astype(np.uint8), axis=1)
+    img_grad = np.tile(np.linspace(0, 50, num=img_shape[0]),
+                       (img_shape[1], 1)).astype(np.uint8)
 
     """
     cubemap_red_img = np.stack((img_255s, img_grad, img_grad), axis=-1)
@@ -298,16 +339,18 @@ if __name__ == '__main__':
     cubemap_blue_img = np.stack((img_grad, img_grad, img_255s), axis=-1)
     """
 
+    """
     cubemap_side_img = np.stack((img_grad,) * 3, axis=-1)
 
-    cubemap_top_img = np.ones((img_shape[0], img_shape[1], 3)).astype(
-        np.uint8) * 255
+    cubemap_bottom_img = np.ones((img_shape[0], img_shape[1], 3)).astype(
+        np.uint8) * 50
 
-    cubemap_bottom_img = np.zeros((img_shape[0], img_shape[1], 3)).astype(
+    cubemap_top_img = np.zeros((img_shape[0], img_shape[1], 3)).astype(
         np.uint8)
 
     cubemap_imgs = [cubemap_side_img, cubemap_side_img, cubemap_top_img,
                     cubemap_bottom_img, cubemap_side_img, cubemap_side_img]
+    """
 
     """
     cubemap_imgs = [cubemap_red_img, cubemap_red_img, cubemap_green_img,
@@ -328,7 +371,7 @@ if __name__ == '__main__':
                     checkerboard_img, checkerboard_img, checkerboard_img]
     """
 
-    cubemap = get_cubemap_from_ndarrays(cubemap_imgs, flip=False)
+    #cubemap = get_cubemap_from_ndarrays(cubemap_imgs, flip=False)
 
     # Load the skybox
     skybox = cubemap
@@ -339,8 +382,6 @@ if __name__ == '__main__':
     skybox_actor = vtk.vtkSkybox()
     skybox_actor.SetTexture(skybox)
 
-    scene = window.Scene()
-
     scene.UseImageBasedLightingOn()
     if vtk.vtkVersion.GetVTKMajorVersion() >= 9:
         scene.SetEnvironmentTexture(cubemap)
@@ -348,11 +389,6 @@ if __name__ == '__main__':
         scene.SetEnvironmentCubeMap(cubemap)
 
     scene.add(right_hemi_actor)
-
-    view = 'right lateral'
-    if view == 'right lateral':
-        rotate(right_hemi_actor, rotation=(-90, 0, 0, 1))
-        rotate(right_hemi_actor, rotation=(-90, 1, 0, 0))
 
     scene.add(skybox_actor)
     #scene.background((1, 1, 1))
