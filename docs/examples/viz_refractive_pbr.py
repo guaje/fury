@@ -284,6 +284,8 @@ if __name__ == '__main__':
         scene.SetEnvironmentCubeMap(cubemap)
 
     scene.add(skybox_actor)
+    #scene.background((1, 1, 1))
+    #scene.background((0, 0, 0))
 
     #window.show(scene)
 
