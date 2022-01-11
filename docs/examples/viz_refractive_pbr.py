@@ -32,11 +32,6 @@ def build_label(text, font_size=16, color=(1, 1, 1), bold=False, italic=False,
     return label
 
 
-def change_slice_ao_strength(slider):
-    global obj_actor
-    obj_actor.GetProperty().SetOcclusionStrength(slider.value)
-
-
 def change_slice_ior_1(slider):
     global ior_1
     ior_1 = slider.value
@@ -45,11 +40,6 @@ def change_slice_ior_1(slider):
 def change_slice_ior_2(slider):
     global ior_2
     ior_2 = slider.value
-
-
-def change_slice_metallic(slider):
-    global obj_actor
-    obj_actor.GetProperty().SetMetallic(slider.value)
 
 
 def change_slice_roughness(slider):
@@ -187,7 +177,7 @@ if __name__ == '__main__':
     #scene.pitch(70)
 
     # Scene rotation only. For specific skybox only.
-    #scene.yaw(-110)
+    scene.yaw(-110)
 
     #obj_actor = obj_brain()
     #obj_actor = obj_surface()
@@ -199,7 +189,7 @@ if __name__ == '__main__':
     rotate(obj_actor, rotation=(-145, 0, 0, 1))
     rotate(obj_actor, rotation=(-70, 1, 0, 0))
 
-    #rotate(obj_actor, rotation=(-110, 0, 1, 0))
+    rotate(obj_actor, rotation=(-110, 0, 1, 0))
 
     scene.add(obj_actor)
 
@@ -214,13 +204,8 @@ if __name__ == '__main__':
     #ior_2 = 1.  # Air
     #ior_2 = 2.33  # Platinum
 
-    # TODO: Manual handling of PBR
     obj_actor.GetProperty().SetInterpolationToPBR()
-    metallic = .0
     roughness = .0
-    emissive_factor = obj_actor.GetProperty().GetEmissiveFactor()
-    ao_strength = obj_actor.GetProperty().GetOcclusionStrength()
-    obj_actor.GetProperty().SetMetallic(metallic)
     obj_actor.GetProperty().SetRoughness(roughness)
 
     opacity = 1.
@@ -300,18 +285,14 @@ if __name__ == '__main__':
                                              bold=True)
     slider_label_ior_1 = build_label('IOR1')
     slider_label_ior_2 = build_label('IOR2')
-    slider_label_metallic = build_label('Metallic')
     slider_label_roughness = build_label('Roughness')
-    slider_label_ao_strength = build_label('AO Strength')
 
     label_pad_x = .06
 
     pbr_panel.add_element(panel_label_refractive_pbr, (.02, .95))
     pbr_panel.add_element(slider_label_ior_1, (label_pad_x, .86))
     pbr_panel.add_element(slider_label_ior_2, (label_pad_x, .77))
-    pbr_panel.add_element(slider_label_metallic, (label_pad_x, .68))
-    pbr_panel.add_element(slider_label_roughness, (label_pad_x, .59))
-    pbr_panel.add_element(slider_label_ao_strength, (label_pad_x, .5))
+    pbr_panel.add_element(slider_label_roughness, (label_pad_x, .68))
 
     length = 150
     text_template = '{value:.1f}'
@@ -322,29 +303,19 @@ if __name__ == '__main__':
     slider_slice_ior_2 = ui.LineSlider2D(
         initial_value=ior_2, min_value=.1, max_value=5, length=length,
         text_template=text_template)
-    slider_slice_metallic = ui.LineSlider2D(
-        initial_value=metallic, max_value=1, length=length,
-        text_template=text_template)
     slider_slice_roughness = ui.LineSlider2D(
         initial_value=roughness, max_value=1, length=length,
-        text_template=text_template)
-    slider_slice_ao_strength = ui.LineSlider2D(
-        initial_value=ao_strength, max_value=1, length=length,
         text_template=text_template)
 
     slider_slice_ior_1.on_change = change_slice_ior_1
     slider_slice_ior_2.on_change = change_slice_ior_2
-    slider_slice_metallic.on_change = change_slice_metallic
     slider_slice_roughness.on_change = change_slice_roughness
-    slider_slice_ao_strength.on_change = change_slice_ao_strength
 
     slice_pad_x = .46
 
     pbr_panel.add_element(slider_slice_ior_1, (slice_pad_x, .86))
     pbr_panel.add_element(slider_slice_ior_2, (slice_pad_x, .77))
-    pbr_panel.add_element(slider_slice_metallic, (slice_pad_x, .68))
-    pbr_panel.add_element(slider_slice_roughness, (slice_pad_x, .59))
-    pbr_panel.add_element(slider_slice_ao_strength, (slice_pad_x, .5))
+    pbr_panel.add_element(slider_slice_roughness, (slice_pad_x, .68))
 
     scene.add(pbr_panel)
 
