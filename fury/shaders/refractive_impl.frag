@@ -15,7 +15,7 @@ float fresnel = R0 + (1. - R0) * pow((1. - NdV), FRESNEL_POW);
 vec3 prefilteredColor = textureLod(prefilterTex,
     mix(worldRefract, worldReflect, fresnel),
     roughness * prefilterMaxLevel).rgb;
-//fragOutput0 = vec4(prefilteredColor, opacity);
+fragOutput0 = vec4(prefilteredColor, opacity);
 //fragOutput0 = vec4(prefilteredColorV3, opacity);
 
 //fragOutput0 = vec4(specularColor, opacity);
@@ -51,7 +51,7 @@ float specF = pow(NdV, 10.);
 vec3 LoTmp = vec3(DiffuseLambert(albedo) * NdV + vec3(specF));
 //fragOutput0 = vec4(LoTmp, opacity);
 
-vec3 ambientV3 = irradiance * DiffuseLambert(albedo) * NdV + prefilteredColorV3;
+vec3 ambientV3 = irradiance * DiffuseLambert(albedo) * NdV + prefilteredColor;
 //fragOutput0 = vec4(ambient, opacity);
 //fragOutput0 = vec4(ambientV3, opacity);
 
