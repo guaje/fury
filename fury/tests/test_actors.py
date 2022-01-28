@@ -9,10 +9,10 @@ from scipy.ndimage.measurements import center_of_mass
 from scipy.signal import convolve
 
 from fury import shaders
-from fury import actor, window
+from fury import actor, window, primitive as fp
 from fury.actor import grid
 from fury.decorators import skip_osx, skip_win
-from fury.utils import shallow_copy, rotate, VTK_9_PLUS
+from fury.utils import shallow_copy, rotate
 from fury.testing import assert_greater, assert_greater_equal
 from fury.primitive import prim_sphere
 
@@ -226,7 +226,7 @@ def test_contour_from_roi(interactive=False):
 
     npt.assert_equal(report.objects, 1)
     npt.assert_equal(report2.objects, 2)
-   
+
 
 @pytest.mark.skipif(skip_osx, reason="This test does not work on macOS + "
                                      "Travis. It works on a local machine"
@@ -337,7 +337,7 @@ def test_streamtube_and_line_actors():
 
     c3 = actor.line(lines, colors, depth_cue=True, fake_tube=True)
 
-    shader_obj = c3.GetShaderProperty() if VTK_9_PLUS else c3.GetMapper()
+    shader_obj = c3.GetShaderProperty()
     mapper_code = shader_obj.GetGeometryShaderCode()
     file_code = shaders.load("line.geom")
     npt.assert_equal(mapper_code, file_code)
@@ -804,7 +804,8 @@ def test_points(interactive=False):
 
 
 def test_labels(interactive=False):
-    text_actor = actor.label("Hello")
+    npt.assert_warns(DeprecationWarning, actor.label, "FURY Rocks")
+    text_actor = actor.vector_text("FURY Rocks")
 
     scene = window.Scene()
     scene.add(text_actor)
@@ -845,6 +846,20 @@ def test_spheres(interactive=False):
     arr = window.snapshot(scene)
     report = window.analyze_snapshot(arr, colors=(1, 0, 0))
     npt.assert_equal(report.colors_found, [True])
+
+    # test faces and vertices
+    scene.clear()
+    vertices, faces = fp.prim_sphere(name='symmetric362', gen_faces=False)
+    sphere_actor = actor.sphere(centers=xyzr[:, :3], colors=colors[:],
+                                radii=xyzr[:, 3], opacity=opacity,
+                                vertices=vertices, faces=faces)
+    scene.add(sphere_actor)
+    if interactive:
+        window.show(scene, order_transparent=True)
+    arr = window.snapshot(scene)
+    report = window.analyze_snapshot(arr,
+                                     colors=colors)
+    npt.assert_equal(report.objects, 3)
 
 
 def test_cones_vertices_faces(interactive=False):
