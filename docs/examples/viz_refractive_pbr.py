@@ -3,17 +3,16 @@ from fury import actor, ui, window
 from fury.data import (fetch_viz_cubemaps, fetch_viz_models, read_viz_cubemap,
                        read_viz_models)
 from fury.io import load_cubemap_texture, load_polydata
+from fury.lib import ImageData, Texture, numpy_support
 from fury.utils import (get_actor_from_polydata, get_polydata_colors,
                         get_polydata_vertices, rotate, set_polydata_colors)
 from fury.shaders import add_shader_callback, load, shader_to_actor
 from scipy.spatial import Delaunay
-from vtk.util import numpy_support
 
 
 import math
 import numpy as np
 import random
-import vtk
 
 
 def change_slice_ior_1(slider):
@@ -37,10 +36,10 @@ def change_slice_opacity(slider):
 
 
 def get_cubemap_from_ndarrays(array, flip=True):
-    texture = vtk.vtkTexture()
+    texture = Texture()
     texture.CubeMapOn()
     for idx, img in enumerate(array):
-        vtk_img = vtk.vtkImageData()
+        vtk_img = ImageData()
         vtk_img.SetDimensions(img.shape[1], img.shape[0], 1)
         if flip:
             # Flip horizontally
