@@ -1,7 +1,8 @@
 from dipy.data import get_fnames
 from fury import actor, ui, window
-from fury.data import fetch_viz_models, read_viz_models, read_viz_textures
-from fury.io import load_polydata
+from fury.data import (fetch_viz_cubemaps, fetch_viz_models, read_viz_cubemap,
+                       read_viz_models)
+from fury.io import load_cubemap_texture, load_polydata
 from fury.utils import (get_actor_from_polydata, get_polydata_colors,
                         get_polydata_vertices, rotate, set_polydata_colors)
 from fury.shaders import add_shader_callback, load, shader_to_actor
@@ -11,25 +12,8 @@ from vtk.util import numpy_support
 
 import math
 import numpy as np
-import os
 import random
 import vtk
-
-
-def build_label(text, font_size=16, color=(1, 1, 1), bold=False, italic=False,
-                shadow=False):
-    label = ui.TextBlock2D()
-    label.message = text
-    label.font_size = font_size
-    label.font_family = 'Arial'
-    label.justification = 'left'
-    label.bold = bold
-    label.italic = italic
-    label.shadow = shadow
-    label.actor.GetTextProperty().SetBackgroundColor(0, 0, 0)
-    label.actor.GetTextProperty().SetBackgroundOpacity(0.0)
-    label.color = color
-    return label
 
 
 def change_slice_ior_1(slider):
@@ -69,26 +53,6 @@ def get_cubemap_from_ndarrays(array, flip=True):
         vtk_img.GetPointData().AddArray(vtk_arr)
         vtk_img.GetPointData().SetActiveScalars('Image')
         texture.SetInputDataObject(idx, vtk_img)
-    return texture
-
-
-def get_cubemap(files_names):
-    texture = vtk.vtkTexture()
-    texture.CubeMapOn()
-    for idx, fn in enumerate(files_names):
-        if not os.path.isfile(fn):
-            print('Nonexistent texture file:', fn)
-            return texture
-        else:
-            # Read the images
-            reader_factory = vtk.vtkImageReader2Factory()
-            img_reader = reader_factory.CreateImageReader2(fn)
-            img_reader.SetFileName(fn)
-
-            flip = vtk.vtkImageFlip()
-            flip.SetInputConnection(img_reader.GetOutputPort())
-            flip.SetFilteredAxis(1)  # flip y axis
-            texture.SetInputConnection(idx, flip.GetOutputPort(0))
     return texture
 
 
@@ -171,7 +135,42 @@ def win_callback(obj, event):
 if __name__ == '__main__':
     global control_panel, ior_1, ior_2, obj_actor, pbr_panel, size
 
-    scene = window.Scene()
+    fetch_viz_cubemaps()
+
+    # texture_name = 'skybox'
+    texture_name = 'brudslojan'
+    textures = read_viz_cubemap(texture_name)
+
+    cubemap = load_cubemap_texture(textures)
+
+    """
+    img_shape = (1024, 1024)
+
+    # Flip horizontally
+    img_grad = np.flip(np.tile(np.linspace(0, 255, num=img_shape[0]),
+                               (img_shape[1], 1)).astype(np.uint8), axis=1)
+    cubemap_side_img = np.stack((img_grad,) * 3, axis=-1)
+
+    cubemap_top_img = np.ones((img_shape[0], img_shape[1], 3)).astype(
+        np.uint8) * 255
+
+    cubemap_bottom_img = np.zeros((img_shape[0], img_shape[1], 3)).astype(
+        np.uint8)
+
+    cubemap_imgs = [cubemap_side_img, cubemap_side_img, cubemap_top_img,
+                    cubemap_bottom_img, cubemap_side_img, cubemap_side_img]
+
+    cubemap = get_cubemap_from_ndarrays(cubemap_imgs, flip=False)
+    """
+
+    #cubemap.RepeatOff()
+    #cubemap.EdgeClampOn()
+
+    scene = window.Scene(skybox=cubemap)
+    scene.skybox(gamma_correct=False)
+
+    #scene.background((1, 1, 1))
+    #scene.background((0, 0, 0))
 
     #scene.roll(-145)
     #scene.pitch(70)
@@ -222,77 +221,27 @@ if __name__ == '__main__':
     shader_to_actor(obj_actor, 'fragment', impl_code=fs_impl_code,
                     block='light')
 
-    #texture_name = 'skybox'
-    texture_name = 'brudslojan'
-    cubemap_fns = [read_viz_textures(texture_name + '-px.jpg'),
-                   read_viz_textures(texture_name + '-nx.jpg'),
-                   read_viz_textures(texture_name + '-py.jpg'),
-                   read_viz_textures(texture_name + '-ny.jpg'),
-                   read_viz_textures(texture_name + '-pz.jpg'),
-                   read_viz_textures(texture_name + '-nz.jpg')]
-    # Load the cube map
-    cubemap = get_cubemap(cubemap_fns)
-
-    """
-    img_shape = (1024, 1024)
-
-    # Flip horizontally
-    img_grad = np.flip(np.tile(np.linspace(0, 255, num=img_shape[0]),
-                               (img_shape[1], 1)).astype(np.uint8), axis=1)
-    cubemap_side_img = np.stack((img_grad,) * 3, axis=-1)
-
-    cubemap_top_img = np.ones((img_shape[0], img_shape[1], 3)).astype(
-        np.uint8) * 255
-
-    cubemap_bottom_img = np.zeros((img_shape[0], img_shape[1], 3)).astype(
-        np.uint8)
-
-    cubemap_imgs = [cubemap_side_img, cubemap_side_img, cubemap_top_img,
-                    cubemap_bottom_img, cubemap_side_img, cubemap_side_img]
-
-    cubemap = get_cubemap_from_ndarrays(cubemap_imgs, flip=False)
-    """
-
-    # Load the skybox
-    skybox = cubemap
-    skybox.InterpolateOn()
-    skybox.RepeatOff()
-    skybox.EdgeClampOn()
-
-    skybox_actor = vtk.vtkSkybox()
-    skybox_actor.SetTexture(skybox)
-
-    scene.UseImageBasedLightingOn()
-    if vtk.vtkVersion.GetVTKMajorVersion() >= 9:
-        scene.SetEnvironmentTexture(cubemap)
-    else:
-        scene.SetEnvironmentCubeMap(cubemap)
-
-    scene.add(skybox_actor)
-    #scene.background((1, 1, 1))
-    #scene.background((0, 0, 0))
-
     #window.show(scene)
 
-    show_m = window.ShowManager(scene=scene, reset_camera=False,
-                                order_transparent=True)
+    show_m = window.ShowManager(scene=scene, size=(1920, 1080),
+                                reset_camera=False, order_transparent=True)
     show_m.initialize()
 
-    pbr_panel = ui.Panel2D((320, 500), position=(-25, 5),
+    pbr_panel = ui.Panel2D((400, 200), position=(5, 5),
                            color=(.25, .25, .25), opacity=.75, align='right')
 
-    panel_label_refractive_pbr = build_label('Refractive PBR', font_size=18,
-                                             bold=True)
-    slider_label_ior_1 = build_label('IOR1')
-    slider_label_ior_2 = build_label('IOR2')
-    slider_label_roughness = build_label('Roughness')
+    panel_label_refractive_pbr = ui.TextBlock2D(
+        text='Refractive PBR', font_size=18, bold=True)
+    slider_label_ior_1 = ui.TextBlock2D(text='IoR1', font_size=16)
+    slider_label_ior_2 = ui.TextBlock2D(text='IoR2', font_size=16)
+    slider_label_roughness = ui.TextBlock2D(text='Roughness', font_size=16)
 
     label_pad_x = .06
 
-    pbr_panel.add_element(panel_label_refractive_pbr, (.02, .95))
-    pbr_panel.add_element(slider_label_ior_1, (label_pad_x, .86))
-    pbr_panel.add_element(slider_label_ior_2, (label_pad_x, .77))
-    pbr_panel.add_element(slider_label_roughness, (label_pad_x, .68))
+    pbr_panel.add_element(panel_label_refractive_pbr, (.02, .85))
+    pbr_panel.add_element(slider_label_ior_1, (label_pad_x, .62))
+    pbr_panel.add_element(slider_label_ior_2, (label_pad_x, .38))
+    pbr_panel.add_element(slider_label_roughness, (label_pad_x, .15))
 
     length = 150
     text_template = '{value:.1f}'
@@ -313,22 +262,22 @@ if __name__ == '__main__':
 
     slice_pad_x = .46
 
-    pbr_panel.add_element(slider_slice_ior_1, (slice_pad_x, .86))
-    pbr_panel.add_element(slider_slice_ior_2, (slice_pad_x, .77))
-    pbr_panel.add_element(slider_slice_roughness, (slice_pad_x, .68))
+    pbr_panel.add_element(slider_slice_ior_1, (slice_pad_x, .62))
+    pbr_panel.add_element(slider_slice_ior_2, (slice_pad_x, .38))
+    pbr_panel.add_element(slider_slice_roughness, (slice_pad_x, .15))
 
     scene.add(pbr_panel)
 
-    control_panel = ui.Panel2D((320, 80), position=(-25, 510),
+    control_panel = ui.Panel2D((400, 100), position=(5, 210),
                                color=(.25, .25, .25), opacity=.75,
                                align='right')
 
-    panel_label_control = build_label('Control', font_size=18,
-                                      bold=True)
-    slider_label_opacity = build_label('Opacity')
+    panel_label_control = ui.TextBlock2D(
+        text='Control', font_size=18, bold=True)
+    slider_label_opacity = ui.TextBlock2D(text='Opacity', font_size=16)
 
-    control_panel.add_element(panel_label_control, (.02, .7))
-    control_panel.add_element(slider_label_opacity, (label_pad_x, .3))
+    control_panel.add_element(panel_label_control, (.02, .70))
+    control_panel.add_element(slider_label_opacity, (label_pad_x, .30))
 
     slider_slice_opacity = ui.LineSlider2D(
         initial_value=opacity, max_value=1, length=length,
