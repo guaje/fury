@@ -1,6 +1,7 @@
-from dipy.io.image import load_nifti
-from fury import actor, ui, window
-from fury.data import read_viz_textures
+from fury import ui, window
+from fury.data import fetch_viz_cubemaps, read_viz_cubemap
+from fury.io import load_cubemap_texture
+from fury.lib import ImageData, PolyData, Texture, numpy_support
 from fury.utils import (get_actor_from_polydata, rotate, set_polydata_colors,
                         set_polydata_vertices, set_polydata_triangles)
 from fury.shaders import add_shader_callback, load, shader_to_actor
@@ -10,34 +11,10 @@ from nibabel.nifti1 import Nifti1Image
 from nilearn import datasets, surface
 from nilearn.image import index_img
 import pandas as pd
-from vtk.util import numpy_support
 
 
 import gzip
 import numpy as np
-import os
-import vtk
-
-
-def build_label(text, font_size=16, color=(1, 1, 1), bold=False, italic=False,
-                shadow=False):
-    label = ui.TextBlock2D()
-    label.message = text
-    label.font_size = font_size
-    label.font_family = 'Arial'
-    label.justification = 'left'
-    label.bold = bold
-    label.italic = italic
-    label.shadow = shadow
-    label.actor.GetTextProperty().SetBackgroundColor(0, 0, 0)
-    label.actor.GetTextProperty().SetBackgroundOpacity(0.0)
-    label.color = color
-    return label
-
-
-def change_slice_ao_strength(slider):
-    global right_hemi_actor
-    right_hemi_actor.GetProperty().SetOcclusionStrength(slider.value)
 
 
 def change_slice_ior_1(slider):
@@ -48,11 +25,6 @@ def change_slice_ior_1(slider):
 def change_slice_ior_2(slider):
     global ior_2
     ior_2 = slider.value
-
-
-def change_slice_metallic(slider):
-    global right_hemi_actor
-    right_hemi_actor.GetProperty().SetMetallic(slider.value)
 
 
 def change_slice_roughness(slider):
@@ -119,10 +91,10 @@ def compute_textures(img, affine, mesh, volumes, radius=3):
 
 
 def get_cubemap_from_ndarrays(array, flip=True):
-    texture = vtk.vtkTexture()
+    texture = Texture()
     texture.CubeMapOn()
     for idx, img in enumerate(array):
-        vtk_img = vtk.vtkImageData()
+        vtk_img = ImageData()
         vtk_img.SetDimensions(img.shape[1], img.shape[0], 1)
         if flip:
             # Flip horizontally
@@ -138,29 +110,9 @@ def get_cubemap_from_ndarrays(array, flip=True):
     return texture
 
 
-def get_cubemap(files_names):
-    texture = vtk.vtkTexture()
-    texture.CubeMapOn()
-    for idx, fn in enumerate(files_names):
-        if not os.path.isfile(fn):
-            print('Nonexistent texture file:', fn)
-            return texture
-        else:
-            # Read the images
-            reader_factory = vtk.vtkImageReader2Factory()
-            img_reader = reader_factory.CreateImageReader2(fn)
-            img_reader.SetFileName(fn)
-
-            flip = vtk.vtkImageFlip()
-            flip.SetInputConnection(img_reader.GetOutputPort())
-            flip.SetFilteredAxis(1)  # flip y axis
-            texture.SetInputConnection(idx, flip.GetOutputPort(0))
-    return texture
-
-
 def get_hemisphere_actor(fname, colors=None):
     points, triangles = surface.load_surf_mesh(fname)
-    polydata = vtk.vtkPolyData()
+    polydata = PolyData()
     set_polydata_vertices(polydata, points)
     set_polydata_triangles(polydata, triangles)
     set_polydata_colors(polydata, colors)
@@ -197,7 +149,85 @@ if __name__ == '__main__':
     global control_panel, ior_1, ior_2, pbr_panel, right_hemi_actor, \
         right_max_val, right_textures, size, volume
 
-    scene = window.Scene()
+    fetch_viz_cubemaps()
+
+    # texture_name = 'skybox'
+    texture_name = 'brudslojan'
+    textures = read_viz_cubemap(texture_name)
+
+    cubemap = load_cubemap_texture(textures)
+
+    """
+    # NOTE: Test ndarray texture to cubemap
+    cubemap_img = 255 * np.random.randn(512, 512, 3)
+    cubemap_img[:256] = np.array([255, 0, 0])
+    cubemap_img = cubemap_img.astype(np.uint8)
+    """
+
+    # NOTE: Test px, nx, py, ny, pz, nz
+    #img_shape = (1024, 1024)
+    #img_255s = 255 * np.ones(img_shape).astype(np.uint8)
+
+    """
+    img_zeros = np.zeros(img_shape).astype(np.uint8)
+    cubemap_red_img = np.stack((img_255s, img_zeros, img_zeros), axis=-1)
+    cubemap_green_img = np.stack((img_zeros, img_255s, img_zeros), axis=-1)
+    cubemap_blue_img = np.stack((img_zeros, img_zeros, img_255s), axis=-1)
+    """
+
+    # Flip horizontally
+    # img_grad = np.flip(np.tile(np.linspace(0, 255, num=img_shape[0]),
+    #                           (img_shape[1], 1)).astype(np.uint8), axis=1)
+    #img_grad = np.tile(np.linspace(0, 50, num=img_shape[0]),
+    #                   (img_shape[1], 1)).astype(np.uint8)
+
+    """
+    cubemap_red_img = np.stack((img_255s, img_grad, img_grad), axis=-1)
+    cubemap_green_img = np.stack((img_grad, img_255s, img_grad), axis=-1)
+    cubemap_blue_img = np.stack((img_grad, img_grad, img_255s), axis=-1)
+    """
+
+    """
+    cubemap_side_img = np.stack((img_grad,) * 3, axis=-1)
+
+    cubemap_bottom_img = np.ones((img_shape[0], img_shape[1], 3)).astype(
+        np.uint8) * 50
+
+    cubemap_top_img = np.zeros((img_shape[0], img_shape[1], 3)).astype(
+        np.uint8)
+
+    cubemap_imgs = [cubemap_side_img, cubemap_side_img, cubemap_top_img,
+                    cubemap_bottom_img, cubemap_side_img, cubemap_side_img]
+    """
+
+    """
+    cubemap_imgs = [cubemap_red_img, cubemap_red_img, cubemap_green_img,
+                    cubemap_green_img, cubemap_blue_img, cubemap_blue_img]
+    """
+
+    """
+    tile_size = 16
+    num_tiles = 64
+    num_tiles = int(num_tiles // 2)
+    checkerboard = np.kron(
+        [[1, 0] * num_tiles, [0, 1] * num_tiles] * num_tiles,
+        np.ones((tile_size, tile_size)))
+    checkerboard *= 255
+    checkerboard_img = checkerboard_img.astype(np.uint8)
+    checkerboard_img = np.stack((checkerboard,) * 3, axis=-1)
+    cubemap_imgs = [checkerboard_img, checkerboard_img, checkerboard_img,
+                    checkerboard_img, checkerboard_img, checkerboard_img]
+    """
+
+    #cubemap = get_cubemap_from_ndarrays(cubemap_imgs, flip=False)
+
+    #cubemap.RepeatOff()
+    #cubemap.EdgeClampOn()
+
+    scene = window.Scene(skybox=cubemap)
+    scene.skybox(gamma_correct=False)
+
+    #scene.background((1, 1, 1))
 
     fsaverage = datasets.fetch_surf_fsaverage(mesh='fsaverage')
     #motor_imgs = datasets.fetch_neurovault_motor_task()
@@ -210,19 +240,19 @@ if __name__ == '__main__':
     #fmri_img, fmri_affine = load_nifti(motor_imgs.images[0])
 
     labels = pd.read_csv(haxby_dataset.session_target[0], sep=' ')
-    condition_mask_face = labels['labels'] == 'face'
-    condition_mask_house = labels['labels'] == 'house'
-    nifti_img_face = index_img(haxby_dataset.func[0], condition_mask_face)
-    nifti_img_house = index_img(haxby_dataset.func[0], condition_mask_house)
-    fmri_affine = nifti_img_face.affine
-    fmri_img_face = np.asanyarray(nifti_img_face.dataobj)
-    fmri_img_house = np.asanyarray(nifti_img_house.dataobj)
-    fmri_img_face_max = np.max(fmri_img_face)
-    fmri_img_house_max = np.max(fmri_img_house)
-    fmri_img_max = np.max([fmri_img_face_max, fmri_img_house_max])
-    fmri_img_face = fmri_img_face / fmri_img_max
-    fmri_img_house = fmri_img_house / fmri_img_max
-    fmri_img = fmri_img_face - fmri_img_house
+    condition_mask_1 = labels['labels'] == 'face'
+    condition_mask_2 = labels['labels'] == 'cat'
+    nifti_img_1 = index_img(haxby_dataset.func[0], condition_mask_1)
+    nifti_img_2 = index_img(haxby_dataset.func[0], condition_mask_2)
+    fmri_affine = nifti_img_1.affine
+    fmri_img_1 = np.asanyarray(nifti_img_1.dataobj)
+    fmri_img_2 = np.asanyarray(nifti_img_2.dataobj)
+    fmri_img_max_1 = np.max(fmri_img_1)
+    fmri_img_max_2 = np.max(fmri_img_2)
+    fmri_img_max = np.max([fmri_img_max_1, fmri_img_max_2])
+    fmri_img_1 = fmri_img_1 / fmri_img_max
+    fmri_img_2 = fmri_img_2 / fmri_img_max
+    fmri_img = fmri_img_1 - fmri_img_2
 
     img_shape = fmri_img.shape
     volume = 0
@@ -276,12 +306,7 @@ if __name__ == '__main__':
     # ior_2 = 2.33  # Platinum
 
     right_hemi_actor.GetProperty().SetInterpolationToPBR()
-    metallic = .0
     roughness = .0
-    emissive_factor = right_hemi_actor.GetProperty().GetEmissiveFactor()
-    ao_strength = right_hemi_actor.GetProperty().GetOcclusionStrength()
-
-    right_hemi_actor.GetProperty().SetMetallic(metallic)
     right_hemi_actor.GetProperty().SetRoughness(roughness)
 
     opacity = 1.
@@ -298,100 +323,7 @@ if __name__ == '__main__':
     shader_to_actor(right_hemi_actor, 'fragment', impl_code=fs_impl_code,
                     block='light')
 
-    #texture_name = 'skybox'
-    texture_name = 'brudslojan'
-    cubemap_fns = [read_viz_textures(texture_name + '-px.jpg'),
-                   read_viz_textures(texture_name + '-nx.jpg'),
-                   read_viz_textures(texture_name + '-py.jpg'),
-                   read_viz_textures(texture_name + '-ny.jpg'),
-                   read_viz_textures(texture_name + '-pz.jpg'),
-                   read_viz_textures(texture_name + '-nz.jpg')]
-    # Load the cube map
-    cubemap = get_cubemap(cubemap_fns)
-
-    """
-    # NOTE: Test ndarray texture to cubemap
-    cubemap_img = 255 * np.random.randn(512, 512, 3)
-    cubemap_img[:256] = np.array([255, 0, 0])
-    cubemap_img = cubemap_img.astype(np.uint8)
-    """
-
-    # NOTE: Test px, nx, py, ny, pz, nz
-    img_shape = (1024, 1024)
-    #img_255s = 255 * np.ones(img_shape).astype(np.uint8)
-
-    """
-    img_zeros = np.zeros(img_shape).astype(np.uint8)
-    cubemap_red_img = np.stack((img_255s, img_zeros, img_zeros), axis=-1)
-    cubemap_green_img = np.stack((img_zeros, img_255s, img_zeros), axis=-1)
-    cubemap_blue_img = np.stack((img_zeros, img_zeros, img_255s), axis=-1)
-    """
-
-    # Flip horizontally
-    #img_grad = np.flip(np.tile(np.linspace(0, 255, num=img_shape[0]),
-    #                           (img_shape[1], 1)).astype(np.uint8), axis=1)
-    img_grad = np.tile(np.linspace(0, 50, num=img_shape[0]),
-                       (img_shape[1], 1)).astype(np.uint8)
-
-    """
-    cubemap_red_img = np.stack((img_255s, img_grad, img_grad), axis=-1)
-    cubemap_green_img = np.stack((img_grad, img_255s, img_grad), axis=-1)
-    cubemap_blue_img = np.stack((img_grad, img_grad, img_255s), axis=-1)
-    """
-
-    """
-    cubemap_side_img = np.stack((img_grad,) * 3, axis=-1)
-
-    cubemap_bottom_img = np.ones((img_shape[0], img_shape[1], 3)).astype(
-        np.uint8) * 50
-
-    cubemap_top_img = np.zeros((img_shape[0], img_shape[1], 3)).astype(
-        np.uint8)
-
-    cubemap_imgs = [cubemap_side_img, cubemap_side_img, cubemap_top_img,
-                    cubemap_bottom_img, cubemap_side_img, cubemap_side_img]
-    """
-
-    """
-    cubemap_imgs = [cubemap_red_img, cubemap_red_img, cubemap_green_img,
-                    cubemap_green_img, cubemap_blue_img, cubemap_blue_img]
-    """
-
-    """
-    tile_size = 16
-    num_tiles = 64
-    num_tiles = int(num_tiles // 2)
-    checkerboard = np.kron(
-        [[1, 0] * num_tiles, [0, 1] * num_tiles] * num_tiles,
-        np.ones((tile_size, tile_size)))
-    checkerboard *= 255
-    checkerboard_img = checkerboard_img.astype(np.uint8)
-    checkerboard_img = np.stack((checkerboard,) * 3, axis=-1)
-    cubemap_imgs = [checkerboard_img, checkerboard_img, checkerboard_img,
-                    checkerboard_img, checkerboard_img, checkerboard_img]
-    """
-
-    #cubemap = get_cubemap_from_ndarrays(cubemap_imgs, flip=False)
-
-    # Load the skybox
-    skybox = cubemap
-    skybox.InterpolateOn()
-    skybox.RepeatOff()
-    skybox.EdgeClampOn()
-
-    skybox_actor = vtk.vtkSkybox()
-    skybox_actor.SetTexture(skybox)
-
-    scene.UseImageBasedLightingOn()
-    if vtk.vtkVersion.GetVTKMajorVersion() >= 9:
-        scene.SetEnvironmentTexture(cubemap)
-    else:
-        scene.SetEnvironmentCubeMap(cubemap)
-
     scene.add(right_hemi_actor)
-
-    scene.add(skybox_actor)
-    #scene.background((1, 1, 1))
 
     """
     if view == 'right lateral':
@@ -404,31 +336,27 @@ if __name__ == '__main__':
 
     #window.show(scene)
 
-    show_m = window.ShowManager(scene=scene, reset_camera=False,
-                                order_transparent=True)
+    show_m = window.ShowManager(scene=scene, size=(1920, 1080),
+                                reset_camera=False, order_transparent=True)
     show_m.initialize()
 
-    pbr_panel = ui.Panel2D((320, 500), position=(-25, 5),
-                           color=(.25, .25, .25), opacity=.75, align='right')
+    pbr_panel = ui.Panel2D((400, 200), position=(5, 5), color=(.25, .25, .25),
+                           opacity=.75, align='right')
 
-    panel_label_refractive_pbr = build_label('Refractive PBR', font_size=18,
-                                             bold=True)
-    slider_label_ior_1 = build_label('IOR1')
-    slider_label_ior_2 = build_label('IOR2')
-    slider_label_metallic = build_label('Metallic')
-    slider_label_roughness = build_label('Roughness')
-    slider_label_ao_strength = build_label('AO Strength')
+    panel_label_refractive_pbr = ui.TextBlock2D(
+        text='Refractive PBR', font_size=18, bold=True)
+    slider_label_ior_1 = ui.TextBlock2D(text='IoR1', font_size=16)
+    slider_label_ior_2 = ui.TextBlock2D(text='IoR2', font_size=16)
+    slider_label_roughness = ui.TextBlock2D(text='Roughness', font_size=16)
 
     label_pad_x = .06
 
-    pbr_panel.add_element(panel_label_refractive_pbr, (.02, .95))
-    pbr_panel.add_element(slider_label_ior_1, (label_pad_x, .86))
-    pbr_panel.add_element(slider_label_ior_2, (label_pad_x, .77))
-    pbr_panel.add_element(slider_label_metallic, (label_pad_x, .68))
-    pbr_panel.add_element(slider_label_roughness, (label_pad_x, .59))
-    pbr_panel.add_element(slider_label_ao_strength, (label_pad_x, .5))
+    pbr_panel.add_element(panel_label_refractive_pbr, (.02, .85))
+    pbr_panel.add_element(slider_label_ior_1, (label_pad_x, .62))
+    pbr_panel.add_element(slider_label_ior_2, (label_pad_x, .38))
+    pbr_panel.add_element(slider_label_roughness, (label_pad_x, .15))
 
-    length = 150
+    length = 260
     text_template = '{value:.1f}'
 
     slider_slice_ior_1 = ui.LineSlider2D(
@@ -437,40 +365,30 @@ if __name__ == '__main__':
     slider_slice_ior_2 = ui.LineSlider2D(
         initial_value=ior_2, min_value=.1, max_value=5, length=length,
         text_template=text_template)
-    slider_slice_metallic = ui.LineSlider2D(
-        initial_value=metallic, max_value=1, length=length,
-        text_template=text_template)
     slider_slice_roughness = ui.LineSlider2D(
         initial_value=roughness, max_value=1, length=length,
-        text_template=text_template)
-    slider_slice_ao_strength = ui.LineSlider2D(
-        initial_value=ao_strength, max_value=1, length=length,
         text_template=text_template)
 
     slider_slice_ior_1.on_change = change_slice_ior_1
     slider_slice_ior_2.on_change = change_slice_ior_2
-    slider_slice_metallic.on_change = change_slice_metallic
     slider_slice_roughness.on_change = change_slice_roughness
-    slider_slice_ao_strength.on_change = change_slice_ao_strength
 
-    slice_pad_x = .46
+    slice_pad_x = .28
 
-    pbr_panel.add_element(slider_slice_ior_1, (slice_pad_x, .86))
-    pbr_panel.add_element(slider_slice_ior_2, (slice_pad_x, .77))
-    pbr_panel.add_element(slider_slice_metallic, (slice_pad_x, .68))
-    pbr_panel.add_element(slider_slice_roughness, (slice_pad_x, .59))
-    pbr_panel.add_element(slider_slice_ao_strength, (slice_pad_x, .5))
+    pbr_panel.add_element(slider_slice_ior_1, (slice_pad_x, .62))
+    pbr_panel.add_element(slider_slice_ior_2, (slice_pad_x, .38))
+    pbr_panel.add_element(slider_slice_roughness, (slice_pad_x, .15))
 
     scene.add(pbr_panel)
 
-    control_panel = ui.Panel2D((320, 130), position=(-25, 510),
+    control_panel = ui.Panel2D((400, 130), position=(5, 210),
                                color=(.25, .25, .25), opacity=.75,
                                align='right')
 
-    panel_label_control = build_label('Control', font_size=18,
-                                      bold=True)
-    slider_label_volume = build_label('Volume')
-    slider_label_opacity = build_label('Opacity')
+    panel_label_control = ui.TextBlock2D(
+        text='Control', font_size=18, bold=True)
+    slider_label_volume = ui.TextBlock2D(text='Volume', font_size=16)
+    slider_label_opacity = ui.TextBlock2D(text='Opacity', font_size=16)
 
     control_panel.add_element(panel_label_control, (.02, .8))
     control_panel.add_element(slider_label_volume, (label_pad_x, .55))

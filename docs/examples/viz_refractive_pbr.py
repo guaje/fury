@@ -25,6 +25,11 @@ def change_slice_ior_2(slider):
     ior_2 = slider.value
 
 
+def change_slice_metallic(slider):
+    global obj_actor
+    obj_actor.GetProperty().SetMetallic(slider.value)
+
+
 def change_slice_roughness(slider):
     global obj_actor
     obj_actor.GetProperty().SetRoughness(slider.value)
@@ -203,7 +208,9 @@ if __name__ == '__main__':
     #ior_2 = 2.33  # Platinum
 
     obj_actor.GetProperty().SetInterpolationToPBR()
-    roughness = .0
+    metallic = 0
+    obj_actor.GetProperty().SetMetallic(metallic)
+    roughness = 0
     obj_actor.GetProperty().SetRoughness(roughness)
 
     opacity = 1.
@@ -226,23 +233,25 @@ if __name__ == '__main__':
                                 reset_camera=False, order_transparent=True)
     show_m.initialize()
 
-    pbr_panel = ui.Panel2D((400, 200), position=(5, 5),
-                           color=(.25, .25, .25), opacity=.75, align='right')
+    pbr_panel = ui.Panel2D((400, 230), position=(5, 5), color=(.25, .25, .25),
+                           opacity=.75, align='right')
 
     panel_label_refractive_pbr = ui.TextBlock2D(
         text='Refractive PBR', font_size=18, bold=True)
     slider_label_ior_1 = ui.TextBlock2D(text='IoR1', font_size=16)
     slider_label_ior_2 = ui.TextBlock2D(text='IoR2', font_size=16)
+    slider_label_metallic = ui.TextBlock2D(text='Metallic', font_size=16)
     slider_label_roughness = ui.TextBlock2D(text='Roughness', font_size=16)
 
     label_pad_x = .06
 
-    pbr_panel.add_element(panel_label_refractive_pbr, (.02, .85))
-    pbr_panel.add_element(slider_label_ior_1, (label_pad_x, .62))
-    pbr_panel.add_element(slider_label_ior_2, (label_pad_x, .38))
-    pbr_panel.add_element(slider_label_roughness, (label_pad_x, .15))
+    pbr_panel.add_element(panel_label_refractive_pbr, (.02, .90))
+    pbr_panel.add_element(slider_label_ior_1, (label_pad_x, .70))
+    pbr_panel.add_element(slider_label_ior_2, (label_pad_x, .50))
+    pbr_panel.add_element(slider_label_metallic, (label_pad_x, .30))
+    pbr_panel.add_element(slider_label_roughness, (label_pad_x, .10))
 
-    length = 150
+    length = 260
     text_template = '{value:.1f}'
 
     slider_slice_ior_1 = ui.LineSlider2D(
@@ -251,23 +260,28 @@ if __name__ == '__main__':
     slider_slice_ior_2 = ui.LineSlider2D(
         initial_value=ior_2, min_value=.1, max_value=5, length=length,
         text_template=text_template)
+    slider_slice_metallic = ui.LineSlider2D(
+        initial_value=metallic, max_value=1, length=length,
+        text_template=text_template)
     slider_slice_roughness = ui.LineSlider2D(
         initial_value=roughness, max_value=1, length=length,
         text_template=text_template)
 
     slider_slice_ior_1.on_change = change_slice_ior_1
     slider_slice_ior_2.on_change = change_slice_ior_2
+    slider_slice_metallic.on_change = change_slice_metallic
     slider_slice_roughness.on_change = change_slice_roughness
 
-    slice_pad_x = .46
+    slice_pad_x = .28
 
-    pbr_panel.add_element(slider_slice_ior_1, (slice_pad_x, .62))
-    pbr_panel.add_element(slider_slice_ior_2, (slice_pad_x, .38))
-    pbr_panel.add_element(slider_slice_roughness, (slice_pad_x, .15))
+    pbr_panel.add_element(slider_slice_ior_1, (slice_pad_x, .70))
+    pbr_panel.add_element(slider_slice_ior_2, (slice_pad_x, .50))
+    pbr_panel.add_element(slider_slice_metallic, (slice_pad_x, .30))
+    pbr_panel.add_element(slider_slice_roughness, (slice_pad_x, .10))
 
     scene.add(pbr_panel)
 
-    control_panel = ui.Panel2D((400, 100), position=(5, 210),
+    control_panel = ui.Panel2D((400, 90), position=(5, 240),
                                color=(.25, .25, .25), opacity=.75,
                                align='right')
 
