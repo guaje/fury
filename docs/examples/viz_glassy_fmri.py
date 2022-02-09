@@ -1,3 +1,4 @@
+from dipy.io.image import load_nifti
 from fury import ui, window
 from fury.data import fetch_viz_cubemaps, read_viz_cubemap
 from fury.io import load_cubemap_texture
@@ -15,6 +16,11 @@ import pandas as pd
 
 import gzip
 import numpy as np
+
+
+def change_slice_absorption(slider):
+    global absorption
+    absorption = slider.value
 
 
 def change_slice_ior_1(slider):
@@ -129,8 +135,9 @@ def points_from_gzipped_gifti(fname):
 
 
 def uniforms_callback(_caller, _event, calldata=None):
-    global ior_1, ior_2
+    global absorption, ior_1, ior_2
     if calldata is not None:
+        calldata.SetUniformf('absorption', absorption)
         calldata.SetUniformf('IOR1', ior_1)
         calldata.SetUniformf('IOR2', ior_2)
 
@@ -146,8 +153,8 @@ def win_callback(obj, event):
 
 
 if __name__ == '__main__':
-    global control_panel, ior_1, ior_2, pbr_panel, right_hemi_actor, \
-        right_max_val, right_textures, size, volume
+    global absorption, control_panel, ior_1, ior_2, pbr_panel, \
+        right_hemi_actor, right_max_val, right_textures, size, volume
 
     fetch_viz_cubemaps()
 
@@ -230,15 +237,16 @@ if __name__ == '__main__':
     #scene.background((1, 1, 1))
 
     fsaverage = datasets.fetch_surf_fsaverage(mesh='fsaverage')
-    #motor_imgs = datasets.fetch_neurovault_motor_task()
-    haxby_dataset = datasets.fetch_haxby()
+    motor_imgs = datasets.fetch_neurovault_motor_task()
+    #haxby_dataset = datasets.fetch_haxby()
 
     right_pial_mesh = surface.load_surf_mesh(fsaverage.pial_right)
     #right_infl_mesh = surface.load_surf_mesh(fsaverage.infl_right)
     right_sulc_points = points_from_gzipped_gifti(fsaverage.sulc_right)
 
-    #fmri_img, fmri_affine = load_nifti(motor_imgs.images[0])
+    fmri_img, fmri_affine = load_nifti(motor_imgs.images[0])
 
+    """
     labels = pd.read_csv(haxby_dataset.session_target[0], sep=' ')
     condition_mask_1 = labels['labels'] == 'face'
     condition_mask_2 = labels['labels'] == 'cat'
@@ -253,20 +261,21 @@ if __name__ == '__main__':
     fmri_img_1 = fmri_img_1 / fmri_img_max
     fmri_img_2 = fmri_img_2 / fmri_img_max
     fmri_img = fmri_img_1 - fmri_img_2
+    """
 
     img_shape = fmri_img.shape
     volume = 0
     num_volumes = img_shape[3] if len(img_shape) == 4 else 1
-    num_volumes = 10
+    #num_volumes = 10
     #num_volumes = 1
 
     # NOTE: Evenly spaced N volumes
-    volumes = np.rint(np.linspace(0, img_shape[3] - 1,
-                                  num=num_volumes)).astype(int)
+    #volumes = np.rint(np.linspace(0, img_shape[3] - 1,
+    #                              num=num_volumes)).astype(int)
 
     right_textures = compute_textures(fmri_img, fmri_affine, right_pial_mesh,
-                                      #num_volumes)
-                                      volumes)
+                                      num_volumes)
+                                      #volumes)
 
     """
     from nilearn.plotting import plot_surf_stat_map
@@ -305,6 +314,8 @@ if __name__ == '__main__':
     # ior_2 = 1.  # Air
     # ior_2 = 2.33  # Platinum
 
+    absorption = 2
+
     right_hemi_actor.GetProperty().SetInterpolationToPBR()
     roughness = .0
     right_hemi_actor.GetProperty().SetRoughness(roughness)
@@ -340,21 +351,23 @@ if __name__ == '__main__':
                                 reset_camera=False, order_transparent=True)
     show_m.initialize()
 
-    pbr_panel = ui.Panel2D((400, 200), position=(5, 5), color=(.25, .25, .25),
+    pbr_panel = ui.Panel2D((400, 230), position=(5, 5), color=(.25, .25, .25),
                            opacity=.75, align='right')
 
     panel_label_refractive_pbr = ui.TextBlock2D(
         text='Refractive PBR', font_size=18, bold=True)
     slider_label_ior_1 = ui.TextBlock2D(text='IoR1', font_size=16)
     slider_label_ior_2 = ui.TextBlock2D(text='IoR2', font_size=16)
+    slider_label_absorption = ui.TextBlock2D(text='Absorption', font_size=16)
     slider_label_roughness = ui.TextBlock2D(text='Roughness', font_size=16)
 
     label_pad_x = .06
 
-    pbr_panel.add_element(panel_label_refractive_pbr, (.02, .85))
-    pbr_panel.add_element(slider_label_ior_1, (label_pad_x, .62))
-    pbr_panel.add_element(slider_label_ior_2, (label_pad_x, .38))
-    pbr_panel.add_element(slider_label_roughness, (label_pad_x, .15))
+    pbr_panel.add_element(panel_label_refractive_pbr, (.02, .90))
+    pbr_panel.add_element(slider_label_ior_1, (label_pad_x, .70))
+    pbr_panel.add_element(slider_label_ior_2, (label_pad_x, .50))
+    pbr_panel.add_element(slider_label_absorption, (label_pad_x, .30))
+    pbr_panel.add_element(slider_label_roughness, (label_pad_x, .10))
 
     length = 260
     text_template = '{value:.1f}'
@@ -365,23 +378,28 @@ if __name__ == '__main__':
     slider_slice_ior_2 = ui.LineSlider2D(
         initial_value=ior_2, min_value=.1, max_value=5, length=length,
         text_template=text_template)
+    slider_slice_absorption = ui.LineSlider2D(
+        initial_value=absorption, max_value=5, length=length,
+        text_template=text_template)
     slider_slice_roughness = ui.LineSlider2D(
         initial_value=roughness, max_value=1, length=length,
         text_template=text_template)
 
     slider_slice_ior_1.on_change = change_slice_ior_1
     slider_slice_ior_2.on_change = change_slice_ior_2
+    slider_slice_absorption.on_change = change_slice_absorption
     slider_slice_roughness.on_change = change_slice_roughness
 
     slice_pad_x = .28
 
-    pbr_panel.add_element(slider_slice_ior_1, (slice_pad_x, .62))
-    pbr_panel.add_element(slider_slice_ior_2, (slice_pad_x, .38))
-    pbr_panel.add_element(slider_slice_roughness, (slice_pad_x, .15))
+    pbr_panel.add_element(slider_slice_ior_1, (slice_pad_x, .70))
+    pbr_panel.add_element(slider_slice_ior_2, (slice_pad_x, .50))
+    pbr_panel.add_element(slider_slice_absorption, (slice_pad_x, .30))
+    pbr_panel.add_element(slider_slice_roughness, (slice_pad_x, .10))
 
     scene.add(pbr_panel)
 
-    control_panel = ui.Panel2D((400, 130), position=(5, 210),
+    control_panel = ui.Panel2D((400, 130), position=(5, 240),
                                color=(.25, .25, .25), opacity=.75,
                                align='right')
 

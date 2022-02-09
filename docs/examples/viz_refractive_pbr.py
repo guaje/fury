@@ -15,6 +15,11 @@ import numpy as np
 import random
 
 
+def change_slice_absorption(slider):
+    global absorption
+    absorption = slider.value
+
+
 def change_slice_ior_1(slider):
     global ior_1
     ior_1 = slider.value
@@ -23,11 +28,6 @@ def change_slice_ior_1(slider):
 def change_slice_ior_2(slider):
     global ior_2
     ior_2 = slider.value
-
-
-def change_slice_metallic(slider):
-    global obj_actor
-    obj_actor.GetProperty().SetMetallic(slider.value)
 
 
 def change_slice_roughness(slider):
@@ -120,8 +120,9 @@ def obj_surface():
 
 
 def uniforms_callback(_caller, _event, calldata=None):
-    global ior_1, ior_2
+    global absorption, ior_1, ior_2
     if calldata is not None:
+        calldata.SetUniformf('absorption', absorption)
         calldata.SetUniformf('IOR1', ior_1)
         calldata.SetUniformf('IOR2', ior_2)
 
@@ -137,11 +138,11 @@ def win_callback(obj, event):
 
 
 if __name__ == '__main__':
-    global control_panel, ior_1, ior_2, obj_actor, pbr_panel, size
+    global absorption, control_panel, ior_1, ior_2, obj_actor, pbr_panel, size
 
     fetch_viz_cubemaps()
 
-    # texture_name = 'skybox'
+    #texture_name = 'skybox'
     texture_name = 'brudslojan'
     textures = read_viz_cubemap(texture_name)
 
@@ -171,7 +172,7 @@ if __name__ == '__main__':
     #cubemap.EdgeClampOn()
 
     scene = window.Scene(skybox=cubemap)
-    scene.skybox(gamma_correct=False)
+    #scene.skybox(gamma_correct=False)
 
     #scene.background((1, 1, 1))
     #scene.background((0, 0, 0))
@@ -186,18 +187,18 @@ if __name__ == '__main__':
     #obj_actor = obj_surface()
     #obj_actor = obj_model(model='suzanne.obj', color=(0, 1, 1))
     #obj_actor = obj_model(model='glyptotek.vtk', color=(0, 1, 1))
-    obj_actor = obj_model(model='glyptotek.vtk')
-    #obj_actor = obj_spheres()
+    #obj_actor = obj_model(model='glyptotek.vtk')
+    obj_actor = obj_spheres()
 
-    rotate(obj_actor, rotation=(-145, 0, 0, 1))
-    rotate(obj_actor, rotation=(-70, 1, 0, 0))
+    #rotate(obj_actor, rotation=(-145, 0, 0, 1))
+    #rotate(obj_actor, rotation=(-70, 1, 0, 0))
 
     rotate(obj_actor, rotation=(-110, 0, 1, 0))
 
     scene.add(obj_actor)
 
     scene.reset_camera()
-    scene.zoom(1.9)
+    #scene.zoom(1.9)
 
     ior_1 = 1.  # Air
     #ior_1 = 1.333  # Water(20 °C)
@@ -207,9 +208,9 @@ if __name__ == '__main__':
     #ior_2 = 1.  # Air
     #ior_2 = 2.33  # Platinum
 
+    absorption = 2
+
     obj_actor.GetProperty().SetInterpolationToPBR()
-    metallic = 0
-    obj_actor.GetProperty().SetMetallic(metallic)
     roughness = 0
     obj_actor.GetProperty().SetRoughness(roughness)
 
@@ -240,7 +241,7 @@ if __name__ == '__main__':
         text='Refractive PBR', font_size=18, bold=True)
     slider_label_ior_1 = ui.TextBlock2D(text='IoR1', font_size=16)
     slider_label_ior_2 = ui.TextBlock2D(text='IoR2', font_size=16)
-    slider_label_metallic = ui.TextBlock2D(text='Metallic', font_size=16)
+    slider_label_absorption = ui.TextBlock2D(text='Absorption', font_size=16)
     slider_label_roughness = ui.TextBlock2D(text='Roughness', font_size=16)
 
     label_pad_x = .06
@@ -248,7 +249,7 @@ if __name__ == '__main__':
     pbr_panel.add_element(panel_label_refractive_pbr, (.02, .90))
     pbr_panel.add_element(slider_label_ior_1, (label_pad_x, .70))
     pbr_panel.add_element(slider_label_ior_2, (label_pad_x, .50))
-    pbr_panel.add_element(slider_label_metallic, (label_pad_x, .30))
+    pbr_panel.add_element(slider_label_absorption, (label_pad_x, .30))
     pbr_panel.add_element(slider_label_roughness, (label_pad_x, .10))
 
     length = 260
@@ -260,8 +261,8 @@ if __name__ == '__main__':
     slider_slice_ior_2 = ui.LineSlider2D(
         initial_value=ior_2, min_value=.1, max_value=5, length=length,
         text_template=text_template)
-    slider_slice_metallic = ui.LineSlider2D(
-        initial_value=metallic, max_value=1, length=length,
+    slider_slice_absorption = ui.LineSlider2D(
+        initial_value=absorption, max_value=5, length=length,
         text_template=text_template)
     slider_slice_roughness = ui.LineSlider2D(
         initial_value=roughness, max_value=1, length=length,
@@ -269,14 +270,14 @@ if __name__ == '__main__':
 
     slider_slice_ior_1.on_change = change_slice_ior_1
     slider_slice_ior_2.on_change = change_slice_ior_2
-    slider_slice_metallic.on_change = change_slice_metallic
+    slider_slice_absorption.on_change = change_slice_absorption
     slider_slice_roughness.on_change = change_slice_roughness
 
     slice_pad_x = .28
 
     pbr_panel.add_element(slider_slice_ior_1, (slice_pad_x, .70))
     pbr_panel.add_element(slider_slice_ior_2, (slice_pad_x, .50))
-    pbr_panel.add_element(slider_slice_metallic, (slice_pad_x, .30))
+    pbr_panel.add_element(slider_slice_absorption, (slice_pad_x, .30))
     pbr_panel.add_element(slider_slice_roughness, (slice_pad_x, .10))
 
     scene.add(pbr_panel)

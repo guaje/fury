@@ -1,3 +1,4 @@
+uniform float absorption;
 uniform float IOR1;
 uniform float IOR2;
 
