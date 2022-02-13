@@ -142,8 +142,8 @@ if __name__ == '__main__':
 
     fetch_viz_cubemaps()
 
-    #texture_name = 'skybox'
-    texture_name = 'brudslojan'
+    texture_name = 'skybox'
+    #texture_name = 'brudslojan'
     textures = read_viz_cubemap(texture_name)
 
     cubemap = load_cubemap_texture(textures)
@@ -177,28 +177,32 @@ if __name__ == '__main__':
     #scene.background((1, 1, 1))
     #scene.background((0, 0, 0))
 
+    # Scene rotation for Glyptotek's model
     #scene.roll(-145)
     #scene.pitch(70)
 
-    # Scene rotation only. For specific skybox only.
-    scene.yaw(-110)
+    # Scene rotation for brudslojan skybox
+    #scene.yaw(-110)
 
     #obj_actor = obj_brain()
     #obj_actor = obj_surface()
     #obj_actor = obj_model(model='suzanne.obj', color=(0, 1, 1))
+    obj_actor = obj_model(model='silver_surfer.obj')
     #obj_actor = obj_model(model='glyptotek.vtk', color=(0, 1, 1))
     #obj_actor = obj_model(model='glyptotek.vtk')
-    obj_actor = obj_spheres()
+    #obj_actor = obj_spheres()
 
+    # Glyptotek's rotation with brudslojan skybox
     #rotate(obj_actor, rotation=(-145, 0, 0, 1))
     #rotate(obj_actor, rotation=(-70, 1, 0, 0))
 
-    rotate(obj_actor, rotation=(-110, 0, 1, 0))
+    # Actor rotation for brudslojan skybox
+    #rotate(obj_actor, rotation=(-110, 0, 1, 0))
 
     scene.add(obj_actor)
 
     scene.reset_camera()
-    #scene.zoom(1.9)
+    #scene.zoom(1.9)  # Glyptotek's zoom
 
     ior_1 = 1.  # Air
     #ior_1 = 1.333  # Water(20 °C)
