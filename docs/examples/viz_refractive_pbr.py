@@ -177,11 +177,7 @@ if __name__ == '__main__':
     #scene.background((1, 1, 1))
     #scene.background((0, 0, 0))
 
-    # Scene rotation for Glyptotek's model
-    #scene.roll(-145)
-    #scene.pitch(70)
-
-    # Scene rotation for brudslojan skybox
+    # Scene rotation for brudslojan texture
     #scene.yaw(-110)
 
     #obj_actor = obj_brain()
@@ -192,11 +188,11 @@ if __name__ == '__main__':
     #obj_actor = obj_model(model='glyptotek.vtk')
     #obj_actor = obj_spheres()
 
-    # Glyptotek's rotation with brudslojan skybox
+    # Glyptotek's rotation
     #rotate(obj_actor, rotation=(-145, 0, 0, 1))
     #rotate(obj_actor, rotation=(-70, 1, 0, 0))
 
-    # Actor rotation for brudslojan skybox
+    # Actor rotation for brudslojan texture
     #rotate(obj_actor, rotation=(-110, 0, 1, 0))
 
     scene.add(obj_actor)
