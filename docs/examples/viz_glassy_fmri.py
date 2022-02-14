@@ -47,7 +47,6 @@ def change_slice_opacity(slider):
 
 def change_slice_volume(slider):
     global right_colors, right_hemi_actor, right_max_val, volume
-    # TODO: Special case for one single volume
     val = int(np.round(slider.value))
     if volume != val:
         volume = val
@@ -58,45 +57,19 @@ def change_slice_volume(slider):
         right_vtk_colors.Modified()
 
 
-def colors_from_textures(textures, max_val, cmap='seismic', thr=None,
-                         bg_data=None, bg_cmap='gray_r'):
-    color_cmap = cm.get_cmap(cmap)
-    textures_shape = textures.shape
-    colors = np.empty(textures_shape + (3,))
-    if thr is not None and bg_data is not None:
-        bg_cmap = cm.get_cmap(bg_cmap)
-        bg_min = np.min(bg_data)
-        bg_max = np.max(bg_data)
-        bg_diff = bg_max - bg_min
-    # TODO: This
-    #print('Computing texture for volume ({:02d}/{}): {:4d}'.format(
-    #    idx + 1, num_vols, vol + 1))
-    if len(textures_shape) == 1:
-        for i in range(textures_shape[0]):
-            if thr is not None and bg_data is not None:
-                if -thr <= textures[i] <= thr:
-                    val = (bg_data[i] - bg_min) / bg_diff
-                    # Normalize background data between [0, 1]
-                    colors[i] = np.array(bg_cmap(val))[:3]
-                    continue
-            # Normalize values between [0, 1]
-            val = (textures[i] + max_val) / (2 * max_val)
-            colors[i] = np.array(color_cmap(val))[:3]
-    else:
-        print('Computing colors from textures...')
-        for j in range(textures_shape[1]):
-            for i in range(textures_shape[0]):
-                if thr is not None and bg_data is not None:
-                    val = (bg_data[i] - bg_min) / bg_diff
-                    if -thr <= textures[i, j] <= thr:
-                        # Normalize background data between [0, 1]
-                        colors[i, j] = np.array(bg_cmap(val))[:3]
-                    else:
-                        # Normalize values between [0, 1]
-                        val = (textures[i, j] + max_val) / (2 * max_val)
-                        colors[i, j] = np.array(color_cmap(val))[:3]
-    colors *= 255
-    return colors
+def compute_background_colors(bg_data, bg_cmap='bone_r'):
+    bg_data_shape = bg_data.shape
+    bg_cmap = cm.get_cmap(bg_cmap)
+    bg_min = np.min(bg_data)
+    bg_max = np.max(bg_data)
+    bg_diff = bg_max - bg_min
+    bg_colors = np.empty((bg_data_shape[0], 3))
+    for i in range(bg_data_shape[0]):
+        # Normalize background data between [0, 1]
+        val = (bg_data[i] - bg_min) / bg_diff
+        bg_colors[i] = np.array(bg_cmap(val))[:3]
+    bg_colors *= 255
+    return bg_colors
 
 
 def compute_textures(img, affine, mesh, volumes=1, radius=3):
@@ -114,6 +87,28 @@ def compute_textures(img, affine, mesh, volumes=1, radius=3):
         nifti = Nifti1Image(img[..., vol], affine)
         textures[:, idx] = surface.vol_to_surf(nifti, mesh, radius=radius)
     return textures
+
+
+def compute_texture_colors(textures, max_val, cmap='bwr'):
+    color_cmap = cm.get_cmap(cmap)
+    textures_shape = textures.shape
+    colors = np.empty(textures_shape + (3,))
+    if textures_shape[1] == 1:
+        print('Computing colors from texture...')
+        for i in range(textures_shape[0]):
+            # Normalize values between [0, 1]
+            val = (textures[i] + max_val) / (2 * max_val)
+            colors[i] = np.array(color_cmap(val))[0, :3]
+    else:
+        for j in range(textures_shape[1]):
+            print('Computing colors for texture {:02d}/{}'.format(
+                j + 1, textures_shape[1]))
+            for i in range(textures_shape[0]):
+                # Normalize values between [0, 1]
+                val = (textures[i, j] + max_val) / (2 * max_val)
+                colors[i, j] = np.array(color_cmap(val))[:3]
+    colors *= 255
+    return colors
 
 
 def data_from_neurovault_motor_task():
@@ -179,6 +174,20 @@ def points_from_gzipped_gifti(fname):
     return gifti_img.darrays[0].data
 
 
+def threshold_colors(textures, texture_colors, background_colors, threshold=0):
+    if threshold == 0:
+        return texture_colors
+    else:
+        colors = np.empty(texture_colors.shape)
+        for j in range(textures.shape[1]):
+            for i in range(textures.shape[0]):
+                if -thr < textures[i, j] < thr:
+                    colors[i, j] = background_colors[i]
+                else:
+                    colors[i, j] = texture_colors[i, j]
+        return colors
+
+
 def uniforms_callback(_caller, _event, calldata=None):
     global absorption, ior_1, ior_2
     if calldata is not None:
@@ -199,12 +208,12 @@ def win_callback(obj, event):
 
 if __name__ == '__main__':
     global absorption, control_panel, ior_1, ior_2, pbr_panel, \
-        right_colors, right_hemi_actor, right_max_val, size, volume
+        right_colors, right_hemi_actor, right_max_val, size, thr, volume
 
     fetch_viz_cubemaps()
 
-    #texture_name = 'skybox'
-    texture_name = 'brudslojan'
+    texture_name = 'skybox'
+    #texture_name = 'brudslojan'
     textures = read_viz_cubemap(texture_name)
 
     cubemap = load_cubemap_texture(textures)
@@ -227,11 +236,13 @@ if __name__ == '__main__':
     cubemap_blue_img = np.stack((img_zeros, img_zeros, img_255s), axis=-1)
     """
 
+    """
     # Flip horizontally
-    # img_grad = np.flip(np.tile(np.linspace(0, 255, num=img_shape[0]),
-    #                           (img_shape[1], 1)).astype(np.uint8), axis=1)
-    #img_grad = np.tile(np.linspace(0, 50, num=img_shape[0]),
-    #                   (img_shape[1], 1)).astype(np.uint8)
+    img_grad = np.flip(np.tile(np.linspace(0, 255, num=img_shape[0]),
+                               (img_shape[1], 1)).astype(np.uint8), axis=1)
+    img_grad = np.tile(np.linspace(0, 200, num=img_shape[0]),
+                       (img_shape[1], 1)).astype(np.uint8)
+    """
 
     """
     cubemap_red_img = np.stack((img_255s, img_grad, img_grad), axis=-1)
@@ -243,7 +254,7 @@ if __name__ == '__main__':
     cubemap_side_img = np.stack((img_grad,) * 3, axis=-1)
 
     cubemap_bottom_img = np.ones((img_shape[0], img_shape[1], 3)).astype(
-        np.uint8) * 50
+        np.uint8) * 200
 
     cubemap_top_img = np.zeros((img_shape[0], img_shape[1], 3)).astype(
         np.uint8)
@@ -277,19 +288,21 @@ if __name__ == '__main__':
     #cubemap.EdgeClampOn()
 
     scene = window.Scene(skybox=cubemap)
+    scene.skybox(visible=False)
     #scene.skybox(gamma_correct=False)
 
-    #scene.background((1, 1, 1))
+    scene.background((1, 1, 1))
 
     fsaverage = datasets.fetch_surf_fsaverage(mesh='fsaverage')
 
     right_pial_mesh = surface.load_surf_mesh(fsaverage.pial_right)
     right_sulc_points = points_from_gzipped_gifti(fsaverage.sulc_right)
 
-    #fmri_img, fmri_affine = data_from_neurovault_motor_task()
-    #right_textures = compute_textures(fmri_img, fmri_affine, right_pial_mesh)
-    #num_volumes = 1
+    fmri_img, fmri_affine = data_from_neurovault_motor_task()
+    right_textures = compute_textures(fmri_img, fmri_affine, right_pial_mesh)
+    num_volumes = 1
 
+    """
     fmri_img, fmri_affine = data_from_haxby()
     img_shape = fmri_img.shape
     num_volumes = 10
@@ -300,6 +313,7 @@ if __name__ == '__main__':
     right_textures = compute_textures(fmri_img, fmri_affine, right_pial_mesh,
                                       volumes)
     print('Time: {}'.format(timedelta(seconds=time() - t)))
+    """
 
     """
     from nilearn.plotting import plot_surf_stat_map
@@ -314,23 +328,46 @@ if __name__ == '__main__':
 
     volume = 0
 
+    print('Computing background colors...')
+    t = time()
+    right_bg_colors = compute_background_colors(right_sulc_points)
+    print('Time: {}'.format(timedelta(seconds=time() - t)))
+
     right_max_val = np.max(np.abs(right_textures))
 
-    thr = .01
-    #thr = 1
-
     t = time()
-    right_colors = colors_from_textures(
-        right_textures, right_max_val, thr=thr, bg_data=right_sulc_points)
+    right_tex_colors = compute_texture_colors(right_textures, right_max_val)
+    print('Time: {}'.format(timedelta(seconds=time() - t)))
+
+    #thr = right_max_val * .1
+    thr = .01
+    thr = 1
+
+    print('Thresholding colors...')
+    t = time()
+    right_colors = threshold_colors(right_textures, right_tex_colors,
+                                    right_bg_colors, thr)
     print('Time: {}'.format(timedelta(seconds=time() - t)))
 
     right_hemi_actor = get_hemisphere_actor(fsaverage.infl_right,
                                             colors=right_colors[:, volume, :])
 
+    # Scene rotation for skybox texture
+    scene.pitch(-25)
+
+    # Scene rotation for brudslojan texture
+    #scene.yaw(-110)
+
     view = 'right lateral'
     if view == 'right lateral':
         rotate(right_hemi_actor, rotation=(-90, 0, 0, 1))
         rotate(right_hemi_actor, rotation=(-80, 1, 0, 0))
+
+    # Actor rotation for skybox texture
+    rotate(right_hemi_actor, rotation=(-25, 1, 0, 0))
+
+    # Actor rotation for brudslojan texture
+    #rotate(right_hemi_actor, rotation=(-110, 0, 1, 0))
 
     ior_1 = 1.  # Air
     # ior_1 = 1.333  # Water(20 °C)
@@ -435,7 +472,8 @@ if __name__ == '__main__':
     slider_label_opacity = ui.TextBlock2D(text='Opacity', font_size=16)
 
     control_panel.add_element(panel_label_control, (.02, .8))
-    control_panel.add_element(slider_label_volume, (label_pad_x, .55))
+    if right_colors.shape[1] > 1:
+        control_panel.add_element(slider_label_volume, (label_pad_x, .55))
     control_panel.add_element(slider_label_opacity, (label_pad_x, .2))
 
     slider_slice_volume = ui.LineSlider2D(
@@ -451,7 +489,8 @@ if __name__ == '__main__':
     slider_slice_volume.on_change = change_slice_volume
     slider_slice_opacity.on_change = change_slice_opacity
 
-    control_panel.add_element(slider_slice_volume, (slice_pad_x, .55))
+    if right_colors.shape[1] > 1:
+        control_panel.add_element(slider_slice_volume, (slice_pad_x, .55))
     control_panel.add_element(slider_slice_opacity, (slice_pad_x, .2))
 
     scene.add(control_panel)
