@@ -340,7 +340,7 @@ if __name__ == '__main__':
     print('Time: {}'.format(timedelta(seconds=time() - t)))
 
     #thr = right_max_val * .1
-    thr = .01
+    #thr = .01
     thr = 1
 
     print('Thresholding colors...')
