@@ -1,3 +1,4 @@
+from datetime import timedelta
 from dipy.io.image import load_nifti
 from fury import ui, window
 from fury.data import fetch_viz_cubemaps, read_viz_cubemap
@@ -12,6 +13,7 @@ from nibabel.nifti1 import Nifti1Image
 from nilearn import datasets, surface
 from nilearn.image import index_img
 import pandas as pd
+from time import time
 
 
 import gzip
@@ -44,42 +46,60 @@ def change_slice_opacity(slider):
 
 
 def change_slice_volume(slider):
-    global right_hemi_actor, right_max_val, right_textures, volume
+    global right_colors, right_hemi_actor, right_max_val, volume
+    # TODO: Special case for one single volume
     val = int(np.round(slider.value))
     if volume != val:
         volume = val
         right_vtk_colors = right_hemi_actor.GetMapper().GetInput().\
             GetPointData().GetArray('colors')
-        right_colors = numpy_support.vtk_to_numpy(right_vtk_colors)
-        texture = right_textures[:, volume]
-        right_colors[:] = colors_from_texture(texture, right_max_val)[:]
+        actor_right_colors = numpy_support.vtk_to_numpy(right_vtk_colors)
+        actor_right_colors[:] = right_colors[:, volume, :]
         right_vtk_colors.Modified()
 
 
-def colors_from_texture(texture, max_val, cmap='seismic', thr=None,
-                        bg_data=None, bg_cmap='gray_r'):
+def colors_from_textures(textures, max_val, cmap='seismic', thr=None,
+                         bg_data=None, bg_cmap='gray_r'):
     color_cmap = cm.get_cmap(cmap)
-    colors = np.empty((texture.shape[0], 3))
+    textures_shape = textures.shape
+    colors = np.empty(textures_shape + (3,))
     if thr is not None and bg_data is not None:
         bg_cmap = cm.get_cmap(bg_cmap)
         bg_min = np.min(bg_data)
         bg_max = np.max(bg_data)
         bg_diff = bg_max - bg_min
-    for i in range(texture.shape[0]):
-        if thr is not None and bg_data is not None:
-            if -thr <= texture[i] <= thr:
-                # Normalize background data between [0, 1]
-                val = (bg_data[i] - bg_min) / bg_diff
-                colors[i] = np.array(bg_cmap(val))[:3]
-                continue
-        # Normalize values between [0, 1]
-        val = (texture[i] + max_val) / (2 * max_val)
-        colors[i] = np.array(color_cmap(val))[:3]
+    # TODO: This
+    #print('Computing texture for volume ({:02d}/{}): {:4d}'.format(
+    #    idx + 1, num_vols, vol + 1))
+    if len(textures_shape) == 1:
+        for i in range(textures_shape[0]):
+            if thr is not None and bg_data is not None:
+                if -thr <= textures[i] <= thr:
+                    val = (bg_data[i] - bg_min) / bg_diff
+                    # Normalize background data between [0, 1]
+                    colors[i] = np.array(bg_cmap(val))[:3]
+                    continue
+            # Normalize values between [0, 1]
+            val = (textures[i] + max_val) / (2 * max_val)
+            colors[i] = np.array(color_cmap(val))[:3]
+    else:
+        print('Computing colors from textures...')
+        for j in range(textures_shape[1]):
+            for i in range(textures_shape[0]):
+                if thr is not None and bg_data is not None:
+                    val = (bg_data[i] - bg_min) / bg_diff
+                    if -thr <= textures[i, j] <= thr:
+                        # Normalize background data between [0, 1]
+                        colors[i, j] = np.array(bg_cmap(val))[:3]
+                    else:
+                        # Normalize values between [0, 1]
+                        val = (textures[i, j] + max_val) / (2 * max_val)
+                        colors[i, j] = np.array(color_cmap(val))[:3]
     colors *= 255
     return colors
 
 
-def compute_textures(img, affine, mesh, volumes, radius=3):
+def compute_textures(img, affine, mesh, volumes=1, radius=3):
     if type(volumes) == int:
         if volumes == 1:
             nifti = Nifti1Image(img, affine)
@@ -94,6 +114,31 @@ def compute_textures(img, affine, mesh, volumes, radius=3):
         nifti = Nifti1Image(img[..., vol], affine)
         textures[:, idx] = surface.vol_to_surf(nifti, mesh, radius=radius)
     return textures
+
+
+def data_from_neurovault_motor_task():
+    motor_imgs = datasets.fetch_neurovault_motor_task()
+    fmri_img, fmri_affine = load_nifti(motor_imgs.images[0])
+    return fmri_img, fmri_affine
+
+
+def data_from_haxby():
+    haxby_dataset = datasets.fetch_haxby()
+    labels = pd.read_csv(haxby_dataset.session_target[0], sep=' ')
+    condition_mask_1 = labels['labels'] == 'face'
+    condition_mask_2 = labels['labels'] == 'cat'
+    nifti_img_1 = index_img(haxby_dataset.func[0], condition_mask_1)
+    nifti_img_2 = index_img(haxby_dataset.func[0], condition_mask_2)
+    fmri_affine = nifti_img_1.affine
+    fmri_img_1 = np.asanyarray(nifti_img_1.dataobj)
+    fmri_img_2 = np.asanyarray(nifti_img_2.dataobj)
+    fmri_img_max_1 = np.max(fmri_img_1)
+    fmri_img_max_2 = np.max(fmri_img_2)
+    fmri_img_max = np.max([fmri_img_max_1, fmri_img_max_2])
+    fmri_img_1 = fmri_img_1 / fmri_img_max
+    fmri_img_2 = fmri_img_2 / fmri_img_max
+    fmri_img = fmri_img_1 - fmri_img_2
+    return fmri_img, fmri_affine
 
 
 def get_cubemap_from_ndarrays(array, flip=True):
@@ -154,11 +199,11 @@ def win_callback(obj, event):
 
 if __name__ == '__main__':
     global absorption, control_panel, ior_1, ior_2, pbr_panel, \
-        right_hemi_actor, right_max_val, right_textures, size, volume
+        right_colors, right_hemi_actor, right_max_val, size, volume
 
     fetch_viz_cubemaps()
 
-    # texture_name = 'skybox'
+    #texture_name = 'skybox'
     texture_name = 'brudslojan'
     textures = read_viz_cubemap(texture_name)
 
@@ -232,50 +277,29 @@ if __name__ == '__main__':
     #cubemap.EdgeClampOn()
 
     scene = window.Scene(skybox=cubemap)
-    scene.skybox(gamma_correct=False)
+    #scene.skybox(gamma_correct=False)
 
     #scene.background((1, 1, 1))
 
     fsaverage = datasets.fetch_surf_fsaverage(mesh='fsaverage')
-    motor_imgs = datasets.fetch_neurovault_motor_task()
-    #haxby_dataset = datasets.fetch_haxby()
 
     right_pial_mesh = surface.load_surf_mesh(fsaverage.pial_right)
-    #right_infl_mesh = surface.load_surf_mesh(fsaverage.infl_right)
     right_sulc_points = points_from_gzipped_gifti(fsaverage.sulc_right)
 
-    fmri_img, fmri_affine = load_nifti(motor_imgs.images[0])
-
-    """
-    labels = pd.read_csv(haxby_dataset.session_target[0], sep=' ')
-    condition_mask_1 = labels['labels'] == 'face'
-    condition_mask_2 = labels['labels'] == 'cat'
-    nifti_img_1 = index_img(haxby_dataset.func[0], condition_mask_1)
-    nifti_img_2 = index_img(haxby_dataset.func[0], condition_mask_2)
-    fmri_affine = nifti_img_1.affine
-    fmri_img_1 = np.asanyarray(nifti_img_1.dataobj)
-    fmri_img_2 = np.asanyarray(nifti_img_2.dataobj)
-    fmri_img_max_1 = np.max(fmri_img_1)
-    fmri_img_max_2 = np.max(fmri_img_2)
-    fmri_img_max = np.max([fmri_img_max_1, fmri_img_max_2])
-    fmri_img_1 = fmri_img_1 / fmri_img_max
-    fmri_img_2 = fmri_img_2 / fmri_img_max
-    fmri_img = fmri_img_1 - fmri_img_2
-    """
-
-    img_shape = fmri_img.shape
-    volume = 0
-    num_volumes = img_shape[3] if len(img_shape) == 4 else 1
-    #num_volumes = 10
+    #fmri_img, fmri_affine = data_from_neurovault_motor_task()
+    #right_textures = compute_textures(fmri_img, fmri_affine, right_pial_mesh)
     #num_volumes = 1
 
+    fmri_img, fmri_affine = data_from_haxby()
+    img_shape = fmri_img.shape
+    num_volumes = 10
     # NOTE: Evenly spaced N volumes
-    #volumes = np.rint(np.linspace(0, img_shape[3] - 1,
-    #                              num=num_volumes)).astype(int)
-
+    volumes = np.rint(np.linspace(0, img_shape[3] - 1,
+                                  num=num_volumes)).astype(int)
+    t = time()
     right_textures = compute_textures(fmri_img, fmri_affine, right_pial_mesh,
-                                      num_volumes)
-                                      #volumes)
+                                      volumes)
+    print('Time: {}'.format(timedelta(seconds=time() - t)))
 
     """
     from nilearn.plotting import plot_surf_stat_map
@@ -288,18 +312,20 @@ if __name__ == '__main__':
     plt.show()
     """
 
-    right_max_val = np.max(np.abs(right_textures))
-    #right_max_val = np.max(np.abs(scores))
+    volume = 0
 
-    # TODO: Pre-compute colors for each texture
-    right_colors = colors_from_texture(
-        #right_textures[:, volume], right_max_val, thr=1,
-        right_textures[:, volume], right_max_val, thr=.01,
-        bg_data=right_sulc_points)
-        #scores - chance, right_max_val, thr=.1, bg_data=right_sulc_points)
+    right_max_val = np.max(np.abs(right_textures))
+
+    thr = .01
+    #thr = 1
+
+    t = time()
+    right_colors = colors_from_textures(
+        right_textures, right_max_val, thr=thr, bg_data=right_sulc_points)
+    print('Time: {}'.format(timedelta(seconds=time() - t)))
 
     right_hemi_actor = get_hemisphere_actor(fsaverage.infl_right,
-                                            colors=right_colors)
+                                            colors=right_colors[:, volume, :])
 
     view = 'right lateral'
     if view == 'right lateral':
