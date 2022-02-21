@@ -174,17 +174,19 @@ def points_from_gzipped_gifti(fname):
     return gifti_img.darrays[0].data
 
 
-def threshold_colors(textures, texture_colors, background_colors, threshold=0):
+def threshold_colors(textures, texture_colors, background_colors=None,
+                     threshold=0):
     if threshold == 0:
         return texture_colors
     else:
-        colors = np.empty(texture_colors.shape)
+        colors = np.zeros(texture_colors.shape)
         for j in range(textures.shape[1]):
             for i in range(textures.shape[0]):
                 if -thr < textures[i, j] < thr:
-                    colors[i, j] = background_colors[i]
-                else:
-                    colors[i, j] = texture_colors[i, j]
+                    if background_colors is not None:
+                        colors[i, j] = background_colors[i, j]
+                    continue
+                colors[i, j] = texture_colors[i, j]
         return colors
 
 
@@ -288,7 +290,7 @@ if __name__ == '__main__':
     #cubemap.EdgeClampOn()
 
     scene = window.Scene(skybox=cubemap)
-    scene.skybox(visible=False)
+    #scene.skybox(visible=False)
     #scene.skybox(gamma_correct=False)
 
     scene.background((1, 1, 1))
@@ -345,8 +347,8 @@ if __name__ == '__main__':
 
     print('Thresholding colors...')
     t = time()
-    right_colors = threshold_colors(right_textures, right_tex_colors,
-                                    right_bg_colors, thr)
+    right_colors = threshold_colors(right_textures, right_tex_colors, thr)
+                                    #right_bg_colors, thr)
     print('Time: {}'.format(timedelta(seconds=time() - t)))
 
     right_hemi_actor = get_hemisphere_actor(fsaverage.infl_right,
