@@ -146,7 +146,7 @@ def test__points_to_vtk_cells():
     npt.assert_equal(vtk_cells.GetNumberOfCells(), 3)
 
 
-def test_colors(interactive=False):
+def test_colors(interactive=True):
     peak_dirs, peak_vals, peak_affine = generate_peaks()
 
     valid_mask = np.abs(peak_dirs).max(axis=(-2, -1)) > 0
@@ -158,7 +158,7 @@ def test_colors(interactive=False):
               [1, 1, 0]]
 
     peak_actor = PeakActor(peak_dirs, indices, values=peak_vals,
-                           affine=peak_affine, colors=colors)
+                           affine=peak_affine, colors=None)
 
     scene.add(peak_actor)
 
