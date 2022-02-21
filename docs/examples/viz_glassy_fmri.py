@@ -179,7 +179,7 @@ def threshold_colors(textures, texture_colors, background_colors=None,
     if threshold == 0:
         return texture_colors
     else:
-        colors = np.zeros(texture_colors.shape)
+        colors = np.ones(texture_colors.shape) * 255
         for j in range(textures.shape[1]):
             for i in range(textures.shape[0]):
                 if -thr < textures[i, j] < thr:
@@ -290,7 +290,7 @@ if __name__ == '__main__':
     #cubemap.EdgeClampOn()
 
     scene = window.Scene(skybox=cubemap)
-    #scene.skybox(visible=False)
+    scene.skybox(visible=False)
     #scene.skybox(gamma_correct=False)
 
     scene.background((1, 1, 1))
@@ -347,15 +347,16 @@ if __name__ == '__main__':
 
     print('Thresholding colors...')
     t = time()
-    right_colors = threshold_colors(right_textures, right_tex_colors, thr)
-                                    #right_bg_colors, thr)
+    right_colors = threshold_colors(
+        right_textures, right_tex_colors, #threshold=thr)
+        background_colors=right_bg_colors, threshold=thr)
     print('Time: {}'.format(timedelta(seconds=time() - t)))
 
     right_hemi_actor = get_hemisphere_actor(fsaverage.infl_right,
                                             colors=right_colors[:, volume, :])
 
     # Scene rotation for skybox texture
-    scene.pitch(-25)
+    #scene.pitch(-25)  # Look down for a darker IBL background
 
     # Scene rotation for brudslojan texture
     #scene.yaw(-110)
@@ -366,7 +367,7 @@ if __name__ == '__main__':
         rotate(right_hemi_actor, rotation=(-80, 1, 0, 0))
 
     # Actor rotation for skybox texture
-    rotate(right_hemi_actor, rotation=(-25, 1, 0, 0))
+    #rotate(right_hemi_actor, rotation=(-25, 1, 0, 0))
 
     # Actor rotation for brudslojan texture
     #rotate(right_hemi_actor, rotation=(-110, 0, 1, 0))
