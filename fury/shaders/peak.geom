@@ -20,24 +20,22 @@ uniform mat4 MCDCMatrix;
 //VTK::Output::Dec
 
 in vec3 centerVertexMCVSOutput[];
-in vec3 dirVertexMCVSOutput[];
 in vec4 peaksVertexMCVSOutput[][];
-in vec4 vertexMCVSOutput[];
 
 // Convert points to line strips
 layout(points) in;
 layout(line_strip, max_vertices = 4) out;
 
 vec3 orient2rgb(vec3 v)
-{
+{{
     float r = sqrt(dot(v, v));
     if (r != 0)
         return abs(v / r);
     return vec3(1);
-}
+}}
 
 void main()
-{
+{{
     /*
     //vec3 iniPoint = dirVertexMCVSOutput[0] * 1 + centerVertexMCVSOutput[0];
     vec3 iniPoint = dirVertexMCVSOutput[0] * 1 + gl_in[0].gl_Position.xyz;
@@ -54,6 +52,7 @@ void main()
     EmitVertex();
     EndPrimitive();
     */
+    /*
     for(int i = 0; i < 2; i++)
     {
         vec3 iniPoint = dirsVertexMCVSOutput[i].xyz * 1 + gl_in[0].gl_Position.xyz;
@@ -67,4 +66,10 @@ void main()
         EmitVertex();
         EndPrimitive();
     }
-}
+    */
+
+    int numPeaks = {num_peaks};
+
+    gl_Position = gl_in[0].gl_Position;
+    vertexColorGSOutput = vertexColorVSOutput[0];
+}}

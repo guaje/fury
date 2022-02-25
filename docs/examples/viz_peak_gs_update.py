@@ -1,5 +1,5 @@
 from fury import window
-from fury.lib import CellArray, Points, PolyData, PolyDataMapper
+from fury.lib import CellArray, Points, PolyData, PolyDataMapper, numpy_support
 from fury.utils import numpy_to_vtk_points
 from fury.shaders import (attribute_to_actor, load, replace_shader_in_actor,
                           shader_to_actor)
@@ -83,14 +83,6 @@ if __name__ == '__main__':
 
     set_polydata_colors(poly_data, colors)
 
-    mapper = PolyDataMapper()
-    mapper.SetInputData(poly_data)
-    mapper.SetVBOShiftScaleMethod(False)
-    #mapper.ScalarVisibilityOn()
-    ##mapper.SetScalarModeToUsePointFieldData()
-    #mapper.SelectColorArray('colors')
-    #mapper.Update()
-
     test_dir = valid_idx_dirs[:, 0, :]
 
     peaks_shape = valid_dirs.shape
@@ -98,39 +90,59 @@ if __name__ == '__main__':
     peaks_data = np.empty((peaks_shape[:2] + (4,)))
     peaks_data[:, :, :3] = valid_dirs
     peaks_data[:, :peaks_shape[1], 3] = valid_idx_vals[:, :peaks_shape[1]]
-    peaks_data = peaks_data.reshape((peaks_shape[0], peaks_shape[1] * 4))
+
+    peaks_data_shape = (peaks_shape[0], peaks_shape[1] * 4)
+
+    peaks_data = peaks_data.reshape(peaks_data_shape)
+
+    mapper = PolyDataMapper()
+    mapper.SetInputData(poly_data)
+    mapper.SetVBOShiftScaleMethod(False)
+    #mapper.ScalarVisibilityOn()
+    #mapper.SetScalarModeToUsePointFieldData()
+    #mapper.SelectColorArray('colors')
+    #mapper.Update()
 
     peak_actor = Actor()
     peak_actor.SetMapper(mapper)
 
     attribute_to_actor(peak_actor, centers, 'centers')
-
-    attribute_to_actor(peak_actor, test_dir, 'dir')
     attribute_to_actor(peak_actor, peaks_data, 'peaks')
 
     vs_dec_code = \
     """
     in vec3 centers;
-    in vec3 dir;
-    in vec4 peaks[];
+    in float peaks[{length_peaks_array}];
     
     out vec3 centerVertexMCVSOutput;
-    out vec3 dirVertexMCVSOutput;
-    out vec4 peaksVertexMCVSOutput[];
-    out vec4 vertexMCVSOutput;
+    out vec4 peaksVertexMCVSOutput[{num_peaks}];
     """
+
+    vs_dec_code = vs_dec_code.format(length_peaks_array=peaks_data_shape[1],
+                                     num_peaks=peaks_shape[1])
 
     vs_impl_code = \
     """
     centerVertexMCVSOutput = centers;
-    dirVertexMCVSOutput = dir;
-    peaksVertexMCVSOutput = peaks;
-    vertexMCVSOutput = vertexMC;
+    
+    int numPeaks = {num_peaks};
+    for (int i = 0; i < numPeaks; i++)
+    {{
+        peaksVertexMCVSOutput[i] = vec4(peaks[i * 4], peaks[i * 4 + 1], 
+        peaks[i * 4 + 2], peaks[i * 4 + 3]);
+    }}
     """
+
+    vs_impl_code = vs_impl_code.format(num_peaks=peaks_shape[1])
+
+    gs_code = load('peak.geom')
+
+    # TODO: Code injection
+    gs_code = gs_code.format(num_peaks=peaks_shape[1])
 
     shader_to_actor(peak_actor, 'vertex', decl_code=vs_dec_code,
                     impl_code=vs_impl_code)
-    replace_shader_in_actor(peak_actor, 'geometry', load('peak.geom'))
+    replace_shader_in_actor(peak_actor, 'geometry', gs_code)
 
     scene = window.Scene()
 
