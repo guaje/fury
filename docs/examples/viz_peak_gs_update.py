@@ -7,6 +7,7 @@ from fury.shaders import (attribute_to_actor, load, replace_shader_in_actor,
 
 from fury.lib import Actor
 from fury.utils import numpy_to_vtk_colors, set_polydata_colors
+from string import Template
 
 
 import numpy as np
@@ -111,34 +112,33 @@ if __name__ == '__main__':
 
     vs_dec_code = \
     """
+    #define NUM_PEAKS $num_peaks
+    
     in vec3 centers;
-    in float peaks[{length_peaks_array}];
+    in float peaks[$length_peaks_array];
     
     out vec3 centerVertexMCVSOutput;
-    out vec4 peaksVertexMCVSOutput[{num_peaks}];
+    out vec4 peaksVertexMCVSOutput[NUM_PEAKS];
     """
-
-    vs_dec_code = vs_dec_code.format(length_peaks_array=peaks_data_shape[1],
-                                     num_peaks=peaks_shape[1])
+    vs_dec_code = Template(vs_dec_code)
+    vs_dec_code = vs_dec_code.substitute(
+        length_peaks_array=peaks_data_shape[1], num_peaks=peaks_shape[1])
 
     vs_impl_code = \
     """
     centerVertexMCVSOutput = centers;
     
-    int numPeaks = {num_peaks};
-    for (int i = 0; i < numPeaks; i++)
-    {{
+    for(int i = 0; i < NUM_PEAKS; i++)
+    {
         peaksVertexMCVSOutput[i] = vec4(peaks[i * 4], peaks[i * 4 + 1], 
         peaks[i * 4 + 2], peaks[i * 4 + 3]);
-    }}
+    }
+    vertexColorVSOutput = vec4(peaksVertexMCVSOutput[0].a, vec2(0), 1);
     """
 
-    vs_impl_code = vs_impl_code.format(num_peaks=peaks_shape[1])
-
-    gs_code = load('peak.geom')
-
-    # TODO: Code injection
-    gs_code = gs_code.format(num_peaks=peaks_shape[1])
+    gs_code = Template(load('peak.geom'))
+    gs_code = gs_code.substitute(num_peaks=peaks_shape[1],
+                                 max_pnts=peaks_shape[1] * 2)
 
     shader_to_actor(peak_actor, 'vertex', decl_code=vs_dec_code,
                     impl_code=vs_impl_code)
@@ -153,3 +153,12 @@ if __name__ == '__main__':
     scene.reset_clipping_range()
 
     window.show(scene)
+
+    #show_m = window.ShowManager(scene=scene)
+
+    #show_m.initialize()
+
+    #ren_win = show_m.window
+    #print(ren_win.ReportCapabilities())
+
+    #show_m.start()
