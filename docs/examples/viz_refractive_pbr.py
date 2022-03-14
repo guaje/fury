@@ -183,12 +183,12 @@ if __name__ == '__main__':
     #obj_actor = obj_brain()
     #obj_actor = obj_surface()
     #obj_actor = obj_model(model='suzanne.obj', color=(0, 1, 1))
-    obj_actor = obj_model(model='silver_surfer.obj')
+    #obj_actor = obj_model(model='silver_surfer.obj')
     #obj_actor = obj_model(model='glyptotek.vtk', color=(0, 1, 1))
     #obj_actor = obj_model(model='glyptotek.vtk')
     #obj_actor = obj_spheres()
-    #obj_actor = actor.sphere([[0, 0, 0]], (0, 1, 1), radii=2, theta=64,
-    #                         phi=64)
+    obj_actor = actor.sphere([[0, 0, 0]], (0, 1, 1), radii=2, theta=64,
+                             phi=64)
 
     # Glyptotek's rotation
     #rotate(obj_actor, rotation=(-145, 0, 0, 1))
