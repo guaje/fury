@@ -380,7 +380,7 @@ if __name__ == '__main__':
     # ior_2 = 1.  # Air
     # ior_2 = 2.33  # Platinum
 
-    absorption = 2
+    absorption = 3
 
     right_hemi_actor.GetProperty().SetInterpolationToPBR()
     roughness = .0
