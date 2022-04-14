@@ -1,12 +1,8 @@
 from fury import window
-from fury.lib import CellArray, Points, PolyData, PolyDataMapper, numpy_support
-from fury.utils import numpy_to_vtk_points
+from fury.lib import Actor, CellArray, Points, PolyData, PolyDataMapper
 from fury.shaders import (attribute_to_actor, load, replace_shader_in_actor,
                           shader_to_actor)
-
-
-from fury.lib import Actor
-from fury.utils import numpy_to_vtk_colors, set_polydata_colors
+from fury.utils import set_polydata_colors
 from string import Template
 
 
@@ -58,13 +54,9 @@ if __name__ == '__main__':
 
     centers_shape = centers.shape
 
-    vtk_points = numpy_to_vtk_points(centers)
-
     colors = (1, 1, 1)
     colors = np.asarray(colors)
     colors = np.tile(255 * colors, (centers_shape[0], 1))
-    vtk_colors = numpy_to_vtk_colors(colors)
-    vtk_colors.SetName('colors')
 
     vtk_vertices = Points()
     # Create the topology of the point (a vertex)
@@ -133,7 +125,7 @@ if __name__ == '__main__':
         peaksVertexMCVSOutput[i] = vec4(peaks[i * 4], peaks[i * 4 + 1], 
         peaks[i * 4 + 2], peaks[i * 4 + 3]);
     }
-    vertexColorVSOutput = vec4(peaksVertexMCVSOutput[0].a, vec2(0), 1);
+    vertexColorVSOutput = vec4(peaksVertexMCVSOutput[0].r, vec2(0), 1);
     """
 
     gs_code = Template(load('peak.geom'))
