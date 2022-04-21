@@ -92,7 +92,7 @@ if __name__ == '__main__':
 
     num_components = data.shape[1]
     vtk_array = numpy_support.numpy_to_vtk(data)
-    #vtk_array.SetNumberOfComponents(num_components)
+    vtk_array.SetNumberOfComponents(num_components)
     vtk_array.SetName('data')
 
     point_data = mapper.GetInput().GetPointData()
