@@ -160,6 +160,26 @@ def load_image(filename, as_vtktype=False, use_pillow=True):
     return reader.GetOutput() if as_vtktype else image
 
 
+def load_text(file):
+    """Load a text file.
+
+    Parameters
+    ----------
+    file: str
+        Path to the text file.
+
+    Returns
+    -------
+    text: str
+        Text contained in the file.
+    """
+    if not os.path.isfile(file):
+        raise IOError('File {} does not exist.'.format(file))
+    with open(file) as f:
+        text = f.read()
+    return text
+
+
 def save_image(arr, filename, compression_quality=75,
                compression_type='deflation', use_pillow=True):
     """Save a 2d or 3d image.
@@ -262,6 +282,11 @@ def load_polydata(file_name):
     output : vtkPolyData
 
     """
+
+    # Check if file actually exists
+    if not os.path.isfile(file_name):
+        raise FileNotFoundError(file_name)
+
     file_extension = file_name.split(".")[-1].lower()
 
     poly_reader = {"vtk": PolyDataReader,
