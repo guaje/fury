@@ -1,7 +1,7 @@
 from fury import window
 from fury.lib import Actor, CellArray, Points, PolyData, PolyDataMapper
-from fury.shaders import (attribute_to_actor, load, replace_shader_in_actor,
-                          shader_to_actor)
+from fury.shaders import (attribute_to_actor, import_fury_shader,
+                          replace_shader_in_actor, shader_to_actor)
 from fury.utils import set_polydata_colors
 from string import Template
 
@@ -128,7 +128,7 @@ if __name__ == '__main__':
     vertexColorVSOutput = vec4(peaksVertexMCVSOutput[0].r, vec2(0), 1);
     """
 
-    gs_code = Template(load('peak.geom'))
+    gs_code = Template(import_fury_shader('peak.geom'))
     gs_code = gs_code.substitute(num_peaks=peaks_shape[1],
                                  max_pnts=peaks_shape[1] * 2)
 
