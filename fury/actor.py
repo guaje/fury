@@ -1,13 +1,13 @@
 """Module that provide actors to render."""
 
 import warnings
-import os.path as op
 from functools import partial
 
 import numpy as np
 
-from fury.shaders import (load, shader_to_actor, attribute_to_actor,
-                          add_shader_callback, replace_shader_in_actor)
+from fury.shaders import (add_shader_callback, attribute_to_actor,
+                          compose_shader, import_fury_shader,
+                          replace_shader_in_actor, shader_to_actor)
 from fury import layout
 from fury.actors.odf_slicer import OdfSlicerActor
 from fury.actors.peak import PeakActor
@@ -22,7 +22,7 @@ from fury.lib import (numpy_support, Transform, ImageData, PolyData, Matrix4x4,
                       PolyDataNormals, Assembly, LODActor, VTK_UNSIGNED_CHAR,
                       PolyDataMapper2D, ScalarBarActor, PolyVertex, CellArray,
                       UnstructuredGrid, DataSetMapper, ConeSource, ArrowSource,
-                      SphereSource, CylinderSource, TexturedSphereSource,
+                      SphereSource, CylinderSource, DiskSource, TexturedSphereSource,
                       Texture, FloatArray, VTK_TEXT_LEFT, VTK_TEXT_RIGHT,
                       VTK_TEXT_BOTTOM, VTK_TEXT_TOP, VTK_TEXT_CENTERED,
                       TexturedActor2D, TextureMapToPlane, TextActor3D,
@@ -762,7 +762,8 @@ def line(lines, colors=None, opacity=1, linewidth=1,
             if program is not None:
                 program.SetUniformf("linewidth", linewidth)
 
-        replace_shader_in_actor(actor, "geometry", load("line.geom"))
+        replace_shader_in_actor(actor, 'geometry',
+                                import_fury_shader('line.geom'))
         add_shader_callback(actor, callback)
 
     if fake_tube:
@@ -832,7 +833,7 @@ def axes(scale=(1, 1, 1), colorx=(1, 0, 0), colory=(0, 1, 0), colorz=(0, 0, 1),
                        colorz + (opacity,)])
 
     scales = np.asarray(scale)
-    arrow_actor = arrow(centers, dirs, colors, scales)
+    arrow_actor = arrow(centers, dirs, colors, scales, repeat_primitive=False)
     return arrow_actor
 
 
@@ -1341,7 +1342,7 @@ def peak_slicer(peaks_dirs, peaks_values=None, mask=None, affine=None,
 
 
 def peak(peaks_dirs, peaks_values=None, mask=None, affine=None, colors=None,
-         linewidth=1, lookup_colormap=None):
+         linewidth=1, lookup_colormap=None, symmetric=True):
     """Visualize peak directions as given from ``peaks_from_model``.
 
     Parameters
@@ -1362,6 +1363,10 @@ def peak(peaks_dirs, peaks_values=None, mask=None, affine=None, colors=None,
         :func:`fury.actor.colormap_lookup_table`.
     linewidth : float, optional
         Line thickness. Default is 1.
+    symmetric: bool, optional
+        If True, peaks are drawn for both peaks_dirs and -peaks_dirs. Else,
+        peaks are only drawn for directions given by peaks_dirs. Default is
+        True.
 
     Returns
     -------
@@ -1417,7 +1422,7 @@ def peak(peaks_dirs, peaks_values=None, mask=None, affine=None, colors=None,
 
     return PeakActor(peaks_dirs, indices, values=peaks_values, affine=affine,
                      colors=colors, lookup_colormap=lookup_colormap,
-                     linewidth=linewidth)
+                     linewidth=linewidth, symmetric=symmetric)
 
 
 def dots(points, color=(1, 0, 0), opacity=1, dot_size=5):
@@ -1515,7 +1520,7 @@ def point(points, colors, point_radius=0.1, phi=8, theta=8, opacity=1.):
 
 
 def sphere(centers, colors, radii=1., phi=16, theta=16,
-           vertices=None, faces=None, opacity=1):
+           vertices=None, faces=None, opacity=1, use_primitive=True):
     """Visualize one or many spheres with different colors and radii
 
     Parameters
@@ -1526,8 +1531,10 @@ def sphere(centers, colors, radii=1., phi=16, theta=16,
         RGB or RGBA (for opacity) R, G, B and A should be at the range [0, 1]
     radii : float or ndarray, shape (N,)
         Sphere radius
-    phi : int
-    theta : int
+    phi : int, optional
+        Set the number of points in the latitude direction
+    theta : int, optional
+        Set the number of points in the longitude direction
     vertices : ndarray, shape (N, 3)
         The point cloud defining the sphere.
     faces : ndarray, shape (M, 3)
@@ -1535,6 +1542,8 @@ def sphere(centers, colors, radii=1., phi=16, theta=16,
         If not then a sphere is created with the provided vertices and faces.
     opacity : float, optional
         Takes values from 0 (fully transparent) to 1 (opaque). Default is 1.
+    use_primitive : boolean, optional
+        If True, uses primitives to create an actor.
 
 
     Returns
@@ -1551,19 +1560,33 @@ def sphere(centers, colors, radii=1., phi=16, theta=16,
     >>> # window.show(scene)
 
     """
-    src = SphereSource() if faces is None else None
+    if not use_primitive:
+        src = SphereSource() if faces is None else None
 
-    if src is not None:
-        src.SetRadius(1)
-        src.SetThetaResolution(theta)
-        src.SetPhiResolution(phi)
+        if src is not None:
+            src.SetRadius(1)
+            src.SetThetaResolution(theta)
+            src.SetPhiResolution(phi)
 
-    sphere_actor = repeat_sources(centers=centers, colors=colors,
-                                  active_scalars=radii, source=src,
-                                  vertices=vertices, faces=faces)
+        sphere_actor = repeat_sources(centers=centers, colors=colors,
+                                      active_scalars=radii, source=src,
+                                      vertices=vertices, faces=faces)
+        sphere_actor.GetProperty().SetOpacity(opacity)
+        return sphere_actor
 
+    scales = np.multiply(radii, [1, 1, 1])
+    directions = (1, 0, 0)
+
+    if faces is None and vertices is None:
+        vertices, faces = fp.prim_sphere(phi=phi, theta=theta)
+
+    res = fp.repeat_primitive(vertices, faces,
+                              directions=directions, centers=centers,
+                              colors=colors, scales=scales)
+    big_verts, big_faces, big_colors, _ = res
+    sphere_actor = get_actor_from_primitive(
+            big_verts, big_faces, big_colors)
     sphere_actor.GetProperty().SetOpacity(opacity)
-
     return sphere_actor
 
 
@@ -1609,19 +1632,91 @@ def cylinder(centers, directions, colors, radius=0.05, heights=1,
     >>> # window.show(scene)
 
     """
-    src = CylinderSource() if faces is None else None
-
-    if src is not None:
+    if faces is None:
+        src = CylinderSource()
         src.SetCapping(capped)
         src.SetResolution(resolution)
         src.SetRadius(radius)
+        rotate = np.array([[0, 1, 0, 0],
+                           [-1, 0, 0, 0],
+                           [0, 0, 1, 0],
+                           [0, 0, 0, 1]])
+    else:
+        src = None
+        rotate = None
 
     cylinder_actor = repeat_sources(centers=centers, colors=colors,
                                     directions=directions,
                                     active_scalars=heights, source=src,
-                                    vertices=vertices, faces=faces)
+                                    vertices=vertices, faces=faces,
+                                    orientation=rotate)
 
     return cylinder_actor
+
+
+def disk(centers, directions, colors, rinner=0.3,
+         router=0.7, cresolution=6, rresolution=2, vertices=None, faces=None):
+    """Visualize one or many disks with different features.
+
+    Parameters
+    ----------
+    centers : ndarray, shape (N, 3)
+        Disk positions
+    directions : ndarray, shape (N, 3)
+        The orientation vector of the disk.
+    colors : ndarray (N,3) or (N, 4) or tuple (3,) or tuple (4,)
+        RGB or RGBA (for opacity) R, G, B and A should be at the range [0, 1]
+    rinner : float
+        disk inner radius, default: 0.3
+    router : float
+        disk outer radius, default: 0.5
+    cresolution: int, optional
+        Number of facets used to define perimeter of disk, default: 6
+    rresolution: int, optional
+        Number of facets used radially, default: 2
+    vertices : ndarray, shape (N, 3)
+        The point cloud defining the disk.
+    faces : ndarray, shape (M, 3)
+        If faces is None then a disk is created based on theta and phi angles
+        If not then a disk is created with the provided vertices and faces.
+
+    Returns
+    -------
+    disk_actor: Actor
+
+    Examples
+    --------
+    >>> from fury import window, actor
+    >>> import numpy as np
+    >>> scene = window.Scene()
+    >>> centers = np.random.rand(5, 3)
+    >>> dirs = np.random.rand(5, 3)
+    >>> colors = np.random.rand(5, 4)
+    >>> actor = actor.disk(centers, dirs, colors,
+    >>>                    rinner=.1, router=.8, cresolution=30)
+    >>> scene.add(actor)
+    >>> window.show(scene)
+    """
+    if faces is None:
+        src = DiskSource()
+        src.SetCircumferentialResolution(cresolution)
+        src.SetRadialResolution(rresolution)
+        src.SetInnerRadius(rinner)
+        src.SetOuterRadius(router)
+        rotate = np.array([[0, 0, -1, 0],
+                           [0, 1, 0, 0],
+                           [1, 0, 0, 0],
+                           [0, 0, 0, 1]])
+    else:
+        src = None
+        rotate = None
+
+    disk_actor = repeat_sources(centers=centers, colors=colors,
+                                directions=directions, source=src,
+                                vertices=vertices, faces=faces,
+                                orientation=rotate)
+
+    return disk_actor
 
 
 def square(centers, directions=(1, 0, 0), colors=(1, 0, 0), scales=1):
@@ -1776,8 +1871,8 @@ def cube(centers, directions=(1, 0, 0), colors=(1, 0, 0), scales=1):
 
 
 def arrow(centers, directions, colors, heights=1., resolution=10,
-          tip_length=0.35, tip_radius=0.1, shaft_radius=0.03,
-          vertices=None, faces=None):
+          tip_length=0.35, tip_radius=0.1, shaft_radius=0.03, scales=1,
+          vertices=None, faces=None, repeat_primitive=True):
     """Visualize one or many arrows with differents features.
 
     Parameters
@@ -1821,6 +1916,14 @@ def arrow(centers, directions, colors, heights=1., resolution=10,
     >>> # window.show(scene)
 
     """
+    if repeat_primitive:
+        vertices, faces = fp.prim_arrow()
+        res = fp.repeat_primitive(vertices, faces, directions=directions, centers=centers,
+                                  colors=colors, scales=scales)
+        big_vertices, big_faces, big_colors, _ = res
+        arrow_actor = get_actor_from_primitive(big_vertices, big_faces, big_colors)
+        return arrow_actor
+
     src = ArrowSource() if faces is None else None
 
     if src is not None:
@@ -1837,7 +1940,7 @@ def arrow(centers, directions, colors, heights=1., resolution=10,
 
 
 def cone(centers, directions, colors, heights=1., resolution=10,
-         vertices=None, faces=None):
+         vertices=None, faces=None, use_primitive=True):
     """Visualize one or many cones with different features.
 
     Parameters
@@ -1858,6 +1961,8 @@ def cone(centers, directions, colors, heights=1., resolution=10,
         If faces is None then a cone is created based on directions, heights
         and resolution. If not then a cone is created with the provided
         vertices and faces.
+    use_primitive: boolean, optional
+        If True uses primitives to create the cone actor.
 
     Returns
     -------
@@ -1875,14 +1980,27 @@ def cone(centers, directions, colors, heights=1., resolution=10,
     >>> # window.show(scene)
 
     """
-    src = ConeSource() if faces is None else None
+    if not use_primitive:
+        src = ConeSource() if faces is None else None
 
-    if src is not None:
-        src.SetResolution(resolution)
+        if src is not None:
+            src.SetResolution(resolution)
 
-    cone_actor = repeat_sources(centers=centers, directions=directions,
-                                colors=colors, active_scalars=heights,
-                                source=src, vertices=vertices, faces=faces)
+        cone_actor = repeat_sources(centers=centers, directions=directions,
+                                    colors=colors, active_scalars=heights,
+                                    source=src, vertices=vertices, faces=faces)
+        return cone_actor
+
+    if faces is None and vertices is None:
+        vertices, faces = fp.prim_cone(sectors=resolution)
+
+    res = fp.repeat_primitive(
+                    vertices, faces, centers,
+                    directions=directions, colors=colors, scales=heights)
+
+    big_verts, big_faces, big_colors, _ = res
+    cone_actor = get_actor_from_primitive(big_verts, big_faces, big_colors)
+
     return cone_actor
 
 
@@ -2149,38 +2267,36 @@ def superquadric(centers, roundness=(1, 1), directions=(1, 0, 0),
 
 
 def billboard(centers, colors=(0, 1, 0), scales=1, vs_dec=None, vs_impl=None,
-              fs_dec=None, fs_impl=None, gs_dec=None, gs_impl=None):
+              gs_prog=None, fs_dec=None, fs_impl=None):
     """Create a billboard actor.
 
-    Billboards are 2D elements incrusted in a 3D world. It offers you the
-    possibility to draw differents shapes/elements at the shader level.
+    Billboards are 2D elements placed in a 3D world. They offer possibility to
+    draw different shapes/elements at the fragment shader level.
 
     Parameters
     ----------
     centers : ndarray, shape (N, 3)
-        Superquadrics positions
+        Billboard positions.
     colors : ndarray (N,3) or (N, 4) or tuple (3,) or tuple (4,)
-        RGB or RGBA (for opacity) R, G, B and A should be at the range [0, 1]
+        RGB or RGBA (for opacity) R, G, B and A should be at the range [0, 1].
     scales : ndarray, shape (N) or (N,3) or float or int, optional
-        The height of the cone.
+        The scale of the billboards.
     vs_dec : str or list of str, optional
-        vertex shaders code that contains all variable/function delarations
+        Vertex Shader code that contains all variable/function declarations.
     vs_impl : str or list of str, optional
-        vertex shaders code that contains all variable/function implementation
+        Vertex Shaders code that contains all variable/function
+        implementations.
+    gs_prog : str, optional
+        Geometry Shader program.
     fs_dec : str or list of str, optional
-        Fragment shaders code that contains all variable/function delarations
+        Fragment Shaders code that contains all variable/function declarations.
     fs_impl : str or list of str, optional
-        Fragment shaders code that contains all variable/function
-        implementation
-    gs_dec : str or list of str, optional
-        Geometry shaders code that contains all variable/function delarations
-    gs_impl : str or list of str, optional
-        Geometry shaders code that contains all variable/function
-        mplementation
+        Fragment Shaders code that contains all variable/function
+        implementation.
 
     Returns
     -------
-    sq_actor: Actor
+    billboard_actor: Actor
 
     """
     verts, faces = fp.prim_square()
@@ -2189,46 +2305,29 @@ def billboard(centers, colors=(0, 1, 0), scales=1, vs_dec=None, vs_impl=None,
 
     big_verts, big_faces, big_colors, big_centers = res
 
-    sq_actor = get_actor_from_primitive(big_verts, big_faces, big_colors)
-    sq_actor.GetMapper().SetVBOShiftScaleMethod(False)
-    sq_actor.GetProperty().BackfaceCullingOff()
-    attribute_to_actor(sq_actor, big_centers, 'center')
+    bb_actor = get_actor_from_primitive(big_verts, big_faces, big_colors)
+    bb_actor.GetMapper().SetVBOShiftScaleMethod(False)
+    bb_actor.GetProperty().BackfaceCullingOff()
+    attribute_to_actor(bb_actor, big_centers, 'center')
 
-    def get_code(glsl_code):
-        code = ""
-        if not glsl_code:
-            return code
+    vs_dec_code = compose_shader([import_fury_shader('billboard_dec.vert') +
+                                  compose_shader(vs_dec)])
+    vs_impl_code = compose_shader([compose_shader(vs_impl) +
+                                   import_fury_shader('billboard_impl.vert')])
+    gs_code = compose_shader(gs_prog)
+    fs_dec_code = compose_shader([import_fury_shader('billboard_dec.frag') +
+                                  compose_shader(fs_dec)])
+    fs_impl_code = compose_shader([import_fury_shader('billboard_impl.frag') +
+                                   compose_shader(fs_impl)])
 
-        if not all(isinstance(i, (str)) for i in glsl_code):
-            raise IOError("The only supported format are string or filename,"
-                          "list of string or filename")
-
-        if isinstance(glsl_code, str):
-            code += "\n"
-            code += load(glsl_code) if op.isfile(glsl_code) else glsl_code
-            return code
-
-        for content in glsl_code:
-            code += "\n"
-            code += load(content) if op.isfile(content) else content
-        return code
-
-    vs_dec_code = get_code(vs_dec) + "\n" + load("billboard_dec.vert")
-    vs_impl_code = get_code(vs_impl) + "\n" + load("billboard_impl.vert")
-    fs_dec_code = get_code(fs_dec) + "\n" + load("billboard_dec.frag")
-    fs_impl_code = load("billboard_impl.frag") + "\n" + get_code(fs_impl)
-    gs_dec_code = get_code(gs_dec)
-    gs_impl_code = get_code(gs_impl)
-
-    shader_to_actor(sq_actor, "vertex", impl_code=vs_impl_code,
+    shader_to_actor(bb_actor, 'vertex', impl_code=vs_impl_code,
                     decl_code=vs_dec_code)
-    shader_to_actor(sq_actor, "fragment", decl_code=fs_dec_code)
-    shader_to_actor(sq_actor, "fragment", impl_code=fs_impl_code,
-                    block="light")
-    shader_to_actor(sq_actor, "geometry", impl_code=gs_impl_code,
-                    decl_code=gs_dec_code, block="output")
+    replace_shader_in_actor(bb_actor, 'geometry', gs_code)
+    shader_to_actor(bb_actor, 'fragment', decl_code=fs_dec_code)
+    shader_to_actor(bb_actor, 'fragment', impl_code=fs_impl_code,
+                    block='light')
 
-    return sq_actor
+    return bb_actor
 
 
 def vector_text(text='Origin', pos=(0, 0, 0), scale=(0.2, 0.2, 0.2),
@@ -2886,10 +2985,10 @@ def sdf(centers, directions=(1, 0, 0), colors=(1, 0, 0), primitives='torus',
     attribute_to_actor(box_actor, rep_scales, 'scale')
     attribute_to_actor(box_actor, rep_directions, 'direction')
 
-    vs_dec_code = load("sdf_dec.vert")
-    vs_impl_code = load("sdf_impl.vert")
-    fs_dec_code = load("sdf_dec.frag")
-    fs_impl_code = load("sdf_impl.frag")
+    vs_dec_code = import_fury_shader('sdf_dec.vert')
+    vs_impl_code = import_fury_shader('sdf_impl.vert')
+    fs_dec_code = import_fury_shader('sdf_dec.frag')
+    fs_impl_code = import_fury_shader('sdf_impl.frag')
 
     shader_to_actor(box_actor, "vertex", impl_code=vs_impl_code,
                     decl_code=vs_dec_code)
@@ -2945,19 +3044,19 @@ def markers(
         'o': 0, 's': 1, 'd': 2, '^': 3, 'p': 4,
         'h': 5, 's6': 6, 'x': 7, '+': 8, '3d': 0}
 
-    vs_dec_code = load("billboard_dec.vert")
-    vs_dec_code += f'\n{load("marker_billboard_dec.vert")}'
-    vs_impl_code = load("billboard_impl.vert")
-    vs_impl_code += f'\n{load("marker_billboard_impl.vert")}'
+    vs_dec_code = import_fury_shader('billboard_dec.vert')
+    vs_dec_code += f'\n{import_fury_shader("marker_billboard_dec.vert")}'
+    vs_impl_code = import_fury_shader('billboard_impl.vert')
+    vs_impl_code += f'\n{import_fury_shader("marker_billboard_impl.vert")}'
 
-    fs_dec_code = load('billboard_dec.frag')
-    fs_dec_code += f'\n{load("marker_billboard_dec.frag")}'
-    fs_impl_code = load('billboard_impl.frag')
+    fs_dec_code = import_fury_shader('billboard_dec.frag')
+    fs_dec_code += f'\n{import_fury_shader("marker_billboard_dec.frag")}'
+    fs_impl_code = import_fury_shader('billboard_impl.frag')
 
     if marker == '3d':
-        fs_impl_code += f'{load("billboard_spheres_impl.frag")}'
+        fs_impl_code += f'{import_fury_shader("billboard_spheres_impl.frag")}'
     else:
-        fs_impl_code += f'{load("marker_billboard_impl.frag")}'
+        fs_impl_code += f'{import_fury_shader("marker_billboard_impl.frag")}'
         if isinstance(marker, str):
             list_of_markers = np.ones(n_markers)*marker2id[marker]
         else:
