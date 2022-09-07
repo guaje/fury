@@ -6,7 +6,8 @@ from fury.io import load_cubemap_texture
 from fury.lib import ImageData, PolyData, Texture, numpy_support
 from fury.utils import (get_actor_from_polydata, rotate, set_polydata_colors,
                         set_polydata_vertices, set_polydata_triangles)
-from fury.shaders import add_shader_callback, load, shader_to_actor
+from fury.shaders import (add_shader_callback, import_fury_shader,
+                          shader_to_actor)
 from matplotlib import cm
 from nibabel import gifti
 from nibabel.nifti1 import Nifti1Image
@@ -57,7 +58,7 @@ def change_slice_volume(slider):
         right_vtk_colors.Modified()
 
 
-def compute_background_colors(bg_data, bg_cmap='bone_r'):
+def compute_background_colors(bg_data, bg_cmap='gray_r'):
     bg_data_shape = bg_data.shape
     bg_cmap = cm.get_cmap(bg_cmap)
     bg_min = np.min(bg_data)
@@ -317,17 +318,6 @@ if __name__ == '__main__':
     print('Time: {}'.format(timedelta(seconds=time() - t)))
     """
 
-    """
-    from nilearn.plotting import plot_surf_stat_map
-    import matplotlib.pyplot as plt
-    #plot_surf_stat_map(fsaverage.infl_right, right_textures,
-    plot_surf_stat_map(fsaverage.infl_right, right_textures[:, 9],
-                       #hemi='right', colorbar=True, threshold=1,
-                       hemi='right', colorbar=True, threshold=.01,
-                       cmap='seismic', bg_map=fsaverage.sulc_right)
-    plt.show()
-    """
-
     volume = 0
 
     print('Computing background colors...')
@@ -337,13 +327,27 @@ if __name__ == '__main__':
 
     right_max_val = np.max(np.abs(right_textures))
 
+    cmap = 'bwr'
+
     t = time()
-    right_tex_colors = compute_texture_colors(right_textures, right_max_val)
+    right_tex_colors = compute_texture_colors(right_textures, right_max_val,
+                                              cmap=cmap)
     print('Time: {}'.format(timedelta(seconds=time() - t)))
 
     #thr = right_max_val * .1
     #thr = .01
     thr = 1
+
+    """
+    from nilearn.plotting import plot_surf_stat_map
+    import matplotlib.pyplot as plt
+    plot_surf_stat_map(fsaverage.infl_right, right_textures,
+    #plot_surf_stat_map(fsaverage.infl_right, right_textures[:, 9],
+                       hemi='right', colorbar=True, threshold=thr,
+                       #cmap=cmap, bg_map=fsaverage.sulc_right)
+                       cmap=cmap)
+    plt.show()
+    """
 
     print('Thresholding colors...')
     t = time()
@@ -391,8 +395,8 @@ if __name__ == '__main__':
 
     add_shader_callback(right_hemi_actor, uniforms_callback)
 
-    fs_dec_code = load('refractive_dec.frag')
-    fs_impl_code = load('refractive_impl.frag')
+    fs_dec_code = import_fury_shader('refractive_dec.frag')
+    fs_impl_code = import_fury_shader('refractive_impl.frag')
 
     #shader_to_actor(right_surf_actor, 'vertex', debug=True)
     #shader_to_actor(right_surf_actor, 'fragment', debug=True)
