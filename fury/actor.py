@@ -22,17 +22,20 @@ from fury.lib import (numpy_support, Transform, ImageData, PolyData, Matrix4x4,
                       PolyDataNormals, Assembly, LODActor, VTK_UNSIGNED_CHAR,
                       PolyDataMapper2D, ScalarBarActor, PolyVertex, CellArray,
                       UnstructuredGrid, DataSetMapper, ConeSource, ArrowSource,
-                      SphereSource, CylinderSource, DiskSource, TexturedSphereSource,
+                      SphereSource, CylinderSource, DiskSource,
+                      TexturedSphereSource,
                       Texture, FloatArray, VTK_TEXT_LEFT, VTK_TEXT_RIGHT,
                       VTK_TEXT_BOTTOM, VTK_TEXT_TOP, VTK_TEXT_CENTERED,
                       TexturedActor2D, TextureMapToPlane, TextActor3D,
-                      Follower, VectorText)
+                      Follower, VectorText, TransformPolyDataFilter,
+                      LinearExtrusionFilter)
 import fury.primitive as fp
 from fury.utils import (lines_to_vtk_polydata, set_input, apply_affine,
                         set_polydata_vertices, set_polydata_triangles,
                         shallow_copy, rgb_to_vtk, numpy_to_vtk_matrix,
                         repeat_sources, get_actor_from_primitive,
-                        fix_winding_order, numpy_to_vtk_colors)
+                        fix_winding_order, numpy_to_vtk_colors, color_check,
+                        set_polydata_primitives_count)
 
 
 def slicer(data, affine=None, value_range=None, opacity=1.,
@@ -587,6 +590,10 @@ def streamtube(lines, colors=None, opacity=1, linewidth=0.1, tube_sides=9,
     poly_data, color_is_scalar = lines_to_vtk_polydata(lines, colors)
     next_input = poly_data
 
+    # set primitives count
+    prim_count = len(lines)
+    set_polydata_primitives_count(poly_data, prim_count)
+
     # Set Normals
     poly_normals = set_input(PolyDataNormals(), next_input)
     poly_normals.ComputeCellNormalsOn()
@@ -720,6 +727,10 @@ def line(lines, colors=None, opacity=1, linewidth=1,
     # Poly data with lines and colors
     poly_data, color_is_scalar = lines_to_vtk_polydata(lines, colors)
     next_input = poly_data
+
+    # set primitives count
+    prim_count = len(lines)
+    set_polydata_primitives_count(poly_data, prim_count)
 
     # use spline interpolation
     if (spline_subdiv is not None) and (spline_subdiv > 0):
@@ -1026,9 +1037,6 @@ def _color_fa(fa, evecs):
         raise ValueError("Wrong number of dimensions for evecs")
 
     return np.abs(evecs[..., 0]) * np.clip(fa, 0, 1)[..., None]
-
-
-
 
 
 def tensor_slicer(evals, evecs, affine=None, mask=None, sphere=None, scale=2.2,
@@ -1425,15 +1433,21 @@ def peak(peaks_dirs, peaks_values=None, mask=None, affine=None, colors=None,
                      linewidth=linewidth, symmetric=symmetric)
 
 
-def dots(points, color=(1, 0, 0), opacity=1, dot_size=5):
-    """Create one or more 3d points.
+def dot(points, colors=None, opacity=None, dot_size=5):
+    """
+    Create one or more 3d points.
 
     Parameters
     ----------
     points : ndarray, (N, 3)
-    color : tuple (3,)
+        dots positions
+    colors : ndarray (N,3) or (N, 4) or tuple (3,) or tuple (4,)
+        RGB or RGBA (for opacity) R, G, B and A should be at the range [0, 1]
     opacity : float, optional
-        Takes values from 0 (fully transparent) to 1 (opaque)
+        Takes values from 0 (fully transparent) to 1 (opaque).
+        If a value is given, each dot will have the same opacity otherwise
+        opacity is set to 1 by default, or is defined by Alpha parameter
+        in colors if given.
     dot_size : int
 
     Returns
@@ -1445,42 +1459,59 @@ def dots(points, color=(1, 0, 0), opacity=1, dot_size=5):
     :func:`fury.actor.point`
 
     """
-    if points.ndim == 2:
-        points_no = points.shape[0]
-    else:
-        points_no = 1
+    if points.ndim != 2:
+        raise ValueError('Invalid points. The shape of the structure must be '
+                         '(Nx3). Your data has {} dimensions.'
+                         .format(points.ndim))
 
-    polyVertexPoints = Points()
-    polyVertexPoints.SetNumberOfPoints(points_no)
-    aPolyVertex = PolyVertex()
-    aPolyVertex.GetPointIds().SetNumberOfIds(points_no)
+    if points.shape[1] != 3:
+        raise ValueError('Invalid points. The shape of the last dimension '
+                         'must be 3. Your data has a last dimension of {}.'
+                         .format(points.shape[1]))
 
-    cnt = 0
-    if points.ndim > 1:
-        for point in points:
-            polyVertexPoints.InsertPoint(cnt, point[0], point[1], point[2])
-            aPolyVertex.GetPointIds().SetId(cnt, cnt)
-            cnt += 1
-    else:
-        polyVertexPoints.InsertPoint(cnt, points[0], points[1], points[2])
-        aPolyVertex.GetPointIds().SetId(cnt, cnt)
-        cnt += 1
+    vtk_vertices = Points()
+    vtk_faces = CellArray()
 
-    aPolyVertexGrid = UnstructuredGrid()
-    aPolyVertexGrid.Allocate(1, 1)
-    aPolyVertexGrid.InsertNextCell(aPolyVertex.GetCellType(),
-                                   aPolyVertex.GetPointIds())
+    # Add points
+    for i in range(len(points)):
+        p = points[i]
+        idd = vtk_vertices.InsertNextPoint(p)
+        vtk_faces.InsertNextCell(1)
+        vtk_faces.InsertCellPoint(idd)
 
-    aPolyVertexGrid.SetPoints(polyVertexPoints)
-    aPolyVertexMapper = DataSetMapper()
-    aPolyVertexMapper.SetInputData(aPolyVertexGrid)
-    aPolyVertexActor = Actor()
-    aPolyVertexActor.SetMapper(aPolyVertexMapper)
+    color_tuple = color_check(len(points), colors)
+    color_array, global_opacity = color_tuple
 
-    aPolyVertexActor.GetProperty().SetColor(color)
-    aPolyVertexActor.GetProperty().SetOpacity(opacity)
-    aPolyVertexActor.GetProperty().SetPointSize(dot_size)
-    return aPolyVertexActor
+    # Create a polydata object
+    polydata = PolyData()
+    polydata.SetPoints(vtk_vertices)
+    polydata.SetVerts(vtk_faces)
+    polydata.GetPointData().SetScalars(color_array)
+
+    # set primitives count
+    prim_count = len(points)
+    set_polydata_primitives_count(polydata, prim_count)
+
+    # Visualize
+    mapper = PolyDataMapper()
+    mapper.SetInputData(polydata)
+
+    # Create an actor
+    poly_actor = Actor()
+    poly_actor.SetMapper(mapper)
+
+    if opacity is not None:
+        poly_actor.GetProperty().SetOpacity(opacity)
+    elif global_opacity >= 0:
+        poly_actor.GetProperty().SetOpacity(global_opacity)
+    poly_actor.GetProperty().SetPointSize(dot_size)
+
+    return poly_actor
+
+
+dots = deprecate_with_version(message="dots function has been renamed dot",
+                              since="0.8.1",
+                              until="0.9.0")(dot)
 
 
 def point(points, colors, point_radius=0.1, phi=8, theta=8, opacity=1.):
@@ -1502,7 +1533,7 @@ def point(points, colors, point_radius=0.1, phi=8, theta=8, opacity=1.):
 
     See Also
     --------
-    :func:`fury.actor.dots`
+    :func:`fury.actor.dot`
     :func:`fury.actor.sphere`
 
     Examples
@@ -1520,7 +1551,7 @@ def point(points, colors, point_radius=0.1, phi=8, theta=8, opacity=1.):
 
 
 def sphere(centers, colors, radii=1., phi=16, theta=16,
-           vertices=None, faces=None, opacity=1, use_primitive=True):
+           vertices=None, faces=None, opacity=1, use_primitive=False):
     """Visualize one or many spheres with different colors and radii
 
     Parameters
@@ -1574,7 +1605,7 @@ def sphere(centers, colors, radii=1., phi=16, theta=16,
         sphere_actor.GetProperty().SetOpacity(opacity)
         return sphere_actor
 
-    scales = np.multiply(radii, [1, 1, 1])
+    scales = radii
     directions = (1, 0, 0)
 
     if faces is None and vertices is None:
@@ -1584,8 +1615,9 @@ def sphere(centers, colors, radii=1., phi=16, theta=16,
                               directions=directions, centers=centers,
                               colors=colors, scales=scales)
     big_verts, big_faces, big_colors, _ = res
+    prim_count = len(centers)
     sphere_actor = get_actor_from_primitive(
-            big_verts, big_faces, big_colors)
+            big_verts, big_faces, big_colors, prim_count=prim_count)
     sphere_actor.GetProperty().SetOpacity(opacity)
     return sphere_actor
 
@@ -1753,7 +1785,9 @@ def square(centers, directions=(1, 0, 0), colors=(1, 0, 0), scales=1):
                               centers=centers, colors=colors, scales=scales)
 
     big_verts, big_faces, big_colors, _ = res
-    sq_actor = get_actor_from_primitive(big_verts, big_faces, big_colors)
+    prim_count = len(centers)
+    sq_actor = get_actor_from_primitive(big_verts, big_faces, big_colors,
+                                        prim_count=prim_count)
     sq_actor.GetProperty().BackfaceCullingOff()
     return sq_actor
 
@@ -1832,7 +1866,9 @@ def box(centers, directions=(1, 0, 0), colors=(1, 0, 0), scales=(1, 2, 3)):
                               centers=centers, colors=colors, scales=scales)
 
     big_verts, big_faces, big_colors, _ = res
-    box_actor = get_actor_from_primitive(big_verts, big_faces, big_colors)
+    prim_count = len(centers)
+    box_actor = get_actor_from_primitive(big_verts, big_faces, big_colors,
+                                         prim_count=prim_count)
     return box_actor
 
 
@@ -1921,7 +1957,9 @@ def arrow(centers, directions, colors, heights=1., resolution=10,
         res = fp.repeat_primitive(vertices, faces, directions=directions, centers=centers,
                                   colors=colors, scales=scales)
         big_vertices, big_faces, big_colors, _ = res
-        arrow_actor = get_actor_from_primitive(big_vertices, big_faces, big_colors)
+        prim_count = len(centers)
+        arrow_actor = get_actor_from_primitive(big_vertices, big_faces, big_colors,
+                                               prim_count=prim_count)
         return arrow_actor
 
     src = ArrowSource() if faces is None else None
@@ -1999,7 +2037,9 @@ def cone(centers, directions, colors, heights=1., resolution=10,
                     directions=directions, colors=colors, scales=heights)
 
     big_verts, big_faces, big_colors, _ = res
-    cone_actor = get_actor_from_primitive(big_verts, big_faces, big_colors)
+    prim_count = len(centers)
+    cone_actor = get_actor_from_primitive(big_verts, big_faces, big_colors,
+                                          prim_count=prim_count)
 
     return cone_actor
 
@@ -2040,7 +2080,9 @@ def triangularprism(centers, directions=(1, 0, 0), colors=(1, 0, 0),
     res = fp.repeat_primitive(verts, faces, directions=directions,
                               centers=centers, colors=colors, scales=scales)
     big_verts, big_faces, big_colors, _ = res
-    tprism_actor = get_actor_from_primitive(big_verts, big_faces, big_colors)
+    prim_count = len(centers)
+    tprism_actor = get_actor_from_primitive(big_verts, big_faces, big_colors,
+                                            prim_count=prim_count)
     return tprism_actor
 
 
@@ -2080,7 +2122,9 @@ def rhombicuboctahedron(centers, directions=(1, 0, 0), colors=(1, 0, 0),
     res = fp.repeat_primitive(verts, faces, directions=directions,
                               centers=centers, colors=colors, scales=scales)
     big_verts, big_faces, big_colors, _ = res
-    rcoh_actor = get_actor_from_primitive(big_verts, big_faces, big_colors)
+    prim_count = len(centers)
+    rcoh_actor = get_actor_from_primitive(big_verts, big_faces, big_colors,
+                                          prim_count=prim_count)
     return rcoh_actor
 
 
@@ -2122,7 +2166,9 @@ def pentagonalprism(centers, directions=(1, 0, 0), colors=(1, 0, 0),
                               centers=centers, colors=colors, scales=scales)
 
     big_verts, big_faces, big_colors, _ = res
-    pent_actor = get_actor_from_primitive(big_verts, big_faces, big_colors)
+    prim_count = len(centers)
+    pent_actor = get_actor_from_primitive(big_verts, big_faces, big_colors,
+                                          prim_count=prim_count)
     return pent_actor
 
 
@@ -2163,7 +2209,9 @@ def octagonalprism(centers, directions=(1, 0, 0), colors=(1, 0, 0),
                               centers=centers, colors=colors, scales=scales)
 
     big_verts, big_faces, big_colors, _ = res
-    oct_actor = get_actor_from_primitive(big_verts, big_faces, big_colors)
+    prim_count = len(centers)
+    oct_actor = get_actor_from_primitive(big_verts, big_faces, big_colors,
+                                         prim_count=prim_count)
     return oct_actor
 
 
@@ -2202,7 +2250,9 @@ def frustum(centers, directions=(1, 0, 0), colors=(0, 1, 0), scales=1):
                               centers=centers, colors=colors, scales=scales)
 
     big_verts, big_faces, big_colors, _ = res
-    frustum_actor = get_actor_from_primitive(big_verts, big_faces, big_colors)
+    prim_count = len(centers)
+    frustum_actor = get_actor_from_primitive(big_verts, big_faces, big_colors,
+                                             prim_count=prim_count)
     return frustum_actor
 
 
@@ -2262,7 +2312,9 @@ def superquadric(centers, roundness=(1, 1), directions=(1, 0, 0),
                                        colors=colors, scales=scales)
 
     big_verts, big_faces, big_colors, _ = res
-    spq_actor = get_actor_from_primitive(big_verts, big_faces, big_colors)
+    prim_count = len(centers)
+    spq_actor = get_actor_from_primitive(big_verts, big_faces, big_colors,
+                                         prim_count=prim_count)
     return spq_actor
 
 
@@ -2305,7 +2357,9 @@ def billboard(centers, colors=(0, 1, 0), scales=1, vs_dec=None, vs_impl=None,
 
     big_verts, big_faces, big_colors, big_centers = res
 
-    bb_actor = get_actor_from_primitive(big_verts, big_faces, big_colors)
+    prim_count = len(centers)
+    bb_actor = get_actor_from_primitive(big_verts, big_faces, big_colors,
+                                        prim_count=prim_count)
     bb_actor.GetMapper().SetVBOShiftScaleMethod(False)
     bb_actor.GetProperty().BackfaceCullingOff()
     attribute_to_actor(bb_actor, big_centers, 'center')
@@ -2331,7 +2385,8 @@ def billboard(centers, colors=(0, 1, 0), scales=1, vs_dec=None, vs_impl=None,
 
 
 def vector_text(text='Origin', pos=(0, 0, 0), scale=(0.2, 0.2, 0.2),
-                color=(1, 1, 1)):
+                color=(1, 1, 1), direction=(0, 0, 1), extrusion=0.0,
+                align_center=False):
     """Create a label actor.
 
     This actor will always face the camera
@@ -2346,6 +2401,13 @@ def vector_text(text='Origin', pos=(0, 0, 0), scale=(0.2, 0.2, 0.2),
         Changes the size of the label.
     color : (3,) array_like
         Label color as ``(r,g,b)`` tuple.
+    direction : (3,) array_like, optional, default: (0, 0, 1)
+        The direction of the label. If None, label will follow the camera.
+    extrusion : float, optional
+        The extrusion amount of the text in Z axis.
+    align_center : bool, optional, default: True
+        If `True`, the anchor of the actor will be the center of the text.
+        If `False`, the anchor will be at the left bottom of the text.
 
     Returns
     -------
@@ -2356,24 +2418,61 @@ def vector_text(text='Origin', pos=(0, 0, 0), scale=(0.2, 0.2, 0.2),
     --------
     >>> from fury import window, actor
     >>> scene = window.Scene()
-    >>> l = actor.label(text='Hello')
+    >>> l = actor.vector_text(text='Hello')
     >>> scene.add(l)
     >>> #window.show(scene)
 
     """
     atext = VectorText()
     atext.SetText(text)
-
     textm = PolyDataMapper()
-    textm.SetInputConnection(atext.GetOutputPort())
 
-    texta = Follower()
+    if extrusion:
+        extruded_text = LinearExtrusionFilter()
+        extruded_text.SetInputConnection(atext.GetOutputPort())
+        extruded_text.SetExtrusionTypeToNormalExtrusion()
+        extruded_text.SetVector(0, 0, extrusion)
+        atext = extruded_text
+
+    trans_matrix = Transform()
+    trans_matrix.PostMultiply()
+
+    if direction is None:
+        # set text to follow the camera if direction is None.
+        texta = Follower()
+
+        def add_to_scene(scene):
+            texta.SetCamera(scene.GetActiveCamera())
+            scene.AddActor(texta)
+        texta.add_to_scene = add_to_scene
+
+    else:
+        texta = Actor()
+        textm.SetInputConnection(atext.GetOutputPort())
+
+        orig_dir = [0, 0, 1]
+        direction = np.array(direction, dtype=float)
+        direction /= np.linalg.norm(direction)
+        normal_vec = np.cross(orig_dir, direction)
+        angle = np.arccos(np.dot(orig_dir, direction))
+        trans_matrix.RotateWXYZ(np.rad2deg(angle), *normal_vec)
+
+    trans_matrix.Scale(*scale[0:2], 1)
+
+    plan = TransformPolyDataFilter()
+    plan.SetInputConnection(atext.GetOutputPort())
+    plan.SetTransform(trans_matrix)
+    textm.SetInputConnection(plan.GetOutputPort())
+
     texta.SetMapper(textm)
-    texta.SetScale(scale)
 
     texta.GetProperty().SetColor(color)
-    texta.SetPosition(pos)
 
+    # Set ser rotation origin to the center of the text is following the camera
+    if align_center or direction is None:
+        trans_matrix.Translate(-np.array(textm.GetCenter()))
+
+    texta.SetPosition(*pos)
     return texta
 
 
@@ -2560,13 +2659,21 @@ class Container(object):
         self.layout.apply(self._items)
         self._need_update = False
 
-    def add_to_scene(self, ren):
+    def add_to_scene(self, scene):
         """ Adds the items of this container to a given scene. """
         for item in self.items:
             if isinstance(item, Container):
-                item.add_to_scene(ren)
+                item.add_to_scene(scene)
             else:
-                ren.add(item)
+                scene.add(item)
+
+    def remove_from_scene(self, scene):
+        """ Removes the items of this container from a given scene. """
+        for item in self.items:
+            if isinstance(item, Container):
+                item.remove_from_scene(scene)
+            else:
+                scene.rm(item)
 
     def GetBounds(self):
         """ Get the bounds of the container. """
@@ -2956,7 +3063,9 @@ def sdf(centers, directions=(1, 0, 0), colors=(1, 0, 0), primitives='torus',
                                    scales=scales)
 
     rep_verts, rep_faces, rep_colors, rep_centers = repeated
-    box_actor = get_actor_from_primitive(rep_verts, rep_faces, rep_colors)
+    prim_count = len(centers)
+    box_actor = get_actor_from_primitive(rep_verts, rep_faces, rep_colors,
+                                         prim_count=prim_count)
     box_actor.GetMapper().SetVBOShiftScaleMethod(False)
 
     if isinstance(primitives,  (list, tuple, np.ndarray)):
@@ -3035,7 +3144,9 @@ def markers(
                               scales=scales)
 
     big_verts, big_faces, big_colors, big_centers = res
-    sq_actor = get_actor_from_primitive(big_verts, big_faces, big_colors)
+    prim_count = len(centers)
+    sq_actor = get_actor_from_primitive(big_verts, big_faces, big_colors,
+                                        prim_count=prim_count)
     sq_actor.GetMapper().SetVBOShiftScaleMethod(False)
     sq_actor.GetProperty().BackfaceCullingOff()
 
