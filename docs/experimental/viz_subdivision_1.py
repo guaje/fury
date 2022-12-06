@@ -19,8 +19,10 @@ if __name__ == '__main__':
         og_roi_actor = actor.contour_from_roi(img_data, affine=img_affine,
                                            color=(0, 1, 0))
 
-        print(og_roi_actor.GetMapper().GetInput().GetNumberOfPoints())
-        print(og_roi_actor.GetMapper().GetInput().GetNumberOfPolys())
+        og_roi_polydata = og_roi_actor.GetMapper().GetInput()
+
+        print(og_roi_polydata.GetNumberOfPoints())
+        print(og_roi_polydata.GetNumberOfPolys())
 
         #subdiv_filter = AdaptiveSubdivisionFilter
         subdiv_filter = ButterflySubdivisionFilter()
