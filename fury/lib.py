@@ -133,8 +133,10 @@ RenderLargeImage = fhvtk.vtkRenderLargeImage
 
 ##############################################################
 #  vtkFiltersModeling Module
-LoopSubdivisionFilter = fmvtk.vtkLoopSubdivisionFilter
+AdaptiveSubdivisionFilter = fmvtk.vtkAdaptiveSubdivisionFilter
 ButterflySubdivisionFilter = fmvtk.vtkButterflySubdivisionFilter
+LinearSubdivisionFilter = fmvtk.vtkLinearSubdivisionFilter
+LoopSubdivisionFilter = fmvtk.vtkLoopSubdivisionFilter
 OutlineFilter = fmvtk.vtkOutlineFilter
 LinearExtrusionFilter = fmvtk.vtkLinearExtrusionFilter
 
