@@ -47,8 +47,8 @@ if __name__ == '__main__':
     scene = window.Scene()
     scene.background((1, 1, 1))
     
-    #obj_actor = actor.sphere([[0, 0, 0]], (0, 0, 0), radii=2, theta=64, phi=64)
-    obj_actor = get_hemisphere_actor()
+    obj_actor = actor.sphere([[0, 0, 0]], (0, 0, 0), radii=2, theta=64, phi=64)
+    #obj_actor = get_hemisphere_actor()
     
     pow5 = import_fury_shader(os.path.join('utils', 'pow5.glsl'))
     
@@ -86,9 +86,11 @@ if __name__ == '__main__':
                 color = vec3(0, 1, 0);
             }
         }
+        /*
         color = blinnPhongIllumModel(
-            dotNV, lightColor0, color, specularPower, specularColor, 
+            dotNV, lightColor0, color, specularPower, specularColor,
             ambientColor);
+        */
         fragOutput0 = vec4(color, opacity);
         """
     
