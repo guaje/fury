@@ -1,5 +1,4 @@
 from fury import actor, material, ui, window
-from fury.io import load_cubemap_texture
 from fury.utils import (
     normals_from_actor,
     tangents_from_direction_of_anisotropy,
