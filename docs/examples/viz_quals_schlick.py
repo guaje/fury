@@ -73,24 +73,25 @@ if __name__ == '__main__':
         vec3 color = vec3(0);
         if(fsw <= .0022)
         {
-            color = vec3(1, 0, 0);
+            color = vec3(1, .5529, .5529);
+            //color = vec3(1, .8510, .8510);
         }
         else
         {
             if(fsw <= .22)
             {
-                color = vec3(1, 1, 0);
+                color = vec3(1, 1, .5529);
+                //color = vec3(1, 1, .8510);
             }
             else
             {
-                color = vec3(0, 1, 0);
+                color = vec3(.5529, 1, .5529);
+                //color = vec3(.8510, 1, .8510);
             }
         }
-        /*
         color = blinnPhongIllumModel(
             dotNV, lightColor0, color, specularPower, specularColor,
             ambientColor);
-        */
         fragOutput0 = vec4(color, opacity);
         """
     
