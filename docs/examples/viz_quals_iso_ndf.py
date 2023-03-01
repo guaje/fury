@@ -73,8 +73,8 @@ if __name__ == '__main__':
     dot_n_v = 'float dotNV = clamp(dot(normal, view), 1e-5, 1);'
     ndf_gtr2 = 'float ndfGTR2 = GTR2(roughness, dotNV);'
     ndf_beckmann = 'float ndfBeckmann = beckmann(roughness, dotNV);'
-    #ndf = 'float ndf = ndfGTR2;'
-    ndf = 'float ndf = ndfBeckmann;'
+    ndf = 'float ndf = ndfGTR2;'
+    #ndf = 'float ndf = ndfBeckmann;'
     frag_output = 'fragOutput0 = vec4(vec3(1) * ndf, opacity);'
     
     fs_impl = compose_shader([
