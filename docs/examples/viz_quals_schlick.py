@@ -1,14 +1,22 @@
 import os
 
+import numpy as np
 from nilearn import datasets, surface
 
 from fury import actor, window
+from fury.data import fetch_viz_models, read_viz_models
+from fury.io import load_polydata
 from fury.lib import PolyData
 from fury.shaders import compose_shader, import_fury_shader, shader_to_actor
 from fury.utils import (
     get_actor_from_polydata,
+    get_polydata_colors,
+    get_polydata_triangles,
+    get_polydata_vertices,
+    normals_from_v_f,
     rotate,
     set_polydata_colors,
+    set_polydata_normals,
     set_polydata_triangles,
     set_polydata_vertices,
 )
@@ -35,6 +43,20 @@ def key_pressed(obj, event):
         print('Image saved.')
 
 
+def load_3D_model(model='molar.stl'):
+    if model != 'molar.stl':
+        fetch_viz_models()
+    model = read_viz_models(model)
+    polydata = load_polydata(model)
+    verts = get_polydata_vertices(polydata)
+    faces = get_polydata_triangles(polydata)
+    norms = normals_from_v_f(verts, faces)
+    set_polydata_normals(polydata, norms)
+    model_actor = get_actor_from_polydata(polydata)
+    rotate(model_actor, rotation=(-90, 1, 0, 0))
+    return model_actor
+
+
 def win_callback(obj, event):
     global control_panel, size
     if size != obj.GetSize():
@@ -47,8 +69,9 @@ if __name__ == '__main__':
     scene = window.Scene()
     scene.background((1, 1, 1))
     
-    obj_actor = actor.sphere([[0, 0, 0]], (0, 0, 0), radii=2, theta=64, phi=64)
+    #obj_actor = actor.sphere([[0, 0, 0]], (0, 0, 0), radii=2, theta=64, phi=64)
     #obj_actor = get_hemisphere_actor()
+    obj_actor = load_3D_model()
     
     pow5 = import_fury_shader(os.path.join('utils', 'pow5.glsl'))
     
@@ -89,9 +112,11 @@ if __name__ == '__main__':
                 //color = vec3(.8510, 1, .8510);
             }
         }
+        /*
         color = blinnPhongIllumModel(
             dotNV, lightColor0, color, specularPower, specularColor,
             ambientColor);
+        */
         fragOutput0 = vec4(color, opacity);
         """
     
