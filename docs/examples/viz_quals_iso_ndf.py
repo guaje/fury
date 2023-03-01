@@ -60,7 +60,11 @@ if __name__ == '__main__':
         os.path.join('lighting', 'ndf', 'gtr2.frag')
     )
     
-    fs_decl = compose_shader([pi, roughness_uniform, square, gtr2])
+    beckmann = import_fury_shader(
+        os.path.join('lighting', 'ndf', 'beckmann.frag')
+    )
+    
+    fs_decl = compose_shader([pi, roughness_uniform, square, gtr2, beckmann])
     
     shader_to_actor(obj_actor, 'fragment', decl_code=fs_decl)
     
@@ -68,11 +72,13 @@ if __name__ == '__main__':
     view = 'vec3 view = normalize(-vertexVC.xyz);'
     dot_n_v = 'float dotNV = clamp(dot(normal, view), 1e-5, 1);'
     ndf_gtr2 = 'float ndfGTR2 = GTR2(roughness, dotNV);'
-    ndf = 'float ndf = ndfGTR2;'
+    ndf_beckmann = 'float ndfBeckmann = beckmann(roughness, dotNV);'
+    #ndf = 'float ndf = ndfGTR2;'
+    ndf = 'float ndf = ndfBeckmann;'
     frag_output = 'fragOutput0 = vec4(vec3(1) * ndf, opacity);'
     
     fs_impl = compose_shader([
-        normal, view, dot_n_v, ndf_gtr2, ndf, frag_output])
+        normal, view, dot_n_v, ndf_gtr2, ndf_beckmann, ndf, frag_output])
     
     shader_to_actor(obj_actor, 'fragment', impl_code=fs_impl, block='light')
     
@@ -83,7 +89,7 @@ if __name__ == '__main__':
         order_transparent=True)
     
     control_panel = ui.Panel2D(
-        (400, 90), position=(5, 240), color=(.25, .25, .25), opacity=.75,
+        (400, 90), position=(5, 5), color=(.25, .25, .25), opacity=.75,
         align='right')
 
     panel_label_control = ui.TextBlock2D(
