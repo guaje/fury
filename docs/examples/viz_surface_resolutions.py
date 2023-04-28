@@ -81,7 +81,7 @@ if __name__ == '__main__':
     scene = window.Scene()
     scene.background((1, 1, 1))
     
-    fsaverage = datasets.fetch_surf_fsaverage(mesh='fsaverage5')
+    fsaverage = datasets.fetch_surf_fsaverage(mesh='fsaverage3')
 
     left_pial_mesh = surface.load_surf_mesh(fsaverage.pial_left)
     left_sulc_points = points_from_gzipped_gifti(fsaverage.sulc_left)
@@ -106,6 +106,7 @@ if __name__ == '__main__':
     right_hemi_actor = get_hemisphere_actor(
         fsaverage.pial_right, colors=right_colors)
     
+    """
     left_hemi_actor.GetProperty().SetRepresentationToSurface()
     left_hemi_actor.GetProperty().EdgeVisibilityOn()
     left_hemi_actor.GetProperty().SetEdgeColor(0, 0, 0)
@@ -113,6 +114,7 @@ if __name__ == '__main__':
     right_hemi_actor.GetProperty().SetRepresentationToSurface()
     right_hemi_actor.GetProperty().EdgeVisibilityOn()
     right_hemi_actor.GetProperty().SetEdgeColor(0, 0, 0)
+    """
     
     scene.add(left_hemi_actor)
     scene.add(right_hemi_actor)
