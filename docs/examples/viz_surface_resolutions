@@ -1,0 +1,91 @@
+import gzip
+from datetime import timedelta
+from time import time
+
+import numpy as np
+from matplotlib import cm
+from nibabel import gifti
+from nilearn import datasets, surface
+from nilearn.connectome import ConnectivityMeasure
+
+from fury import actor, ui, window
+from fury.colormap import distinguishable_colormap
+from fury.data import fetch_viz_cubemaps, read_viz_cubemap
+from fury.io import load_cubemap_texture
+from fury.lib import ImageData, PolyData, Texture, numpy_support
+from fury.material import manifest_principled
+from fury.utils import (get_actor_from_polydata, get_polydata_normals,
+                        normals_from_v_f, set_polydata_colors,
+                        set_polydata_normals, set_polydata_triangles,
+                        set_polydata_vertices, update_polydata_normals)
+
+
+def points_from_gzipped_gifti(fname):
+    with gzip.open(fname) as f:
+        as_bytes = f.read()
+    parser = gifti.GiftiImage.parser()
+    parser.parse(as_bytes)
+    gifti_img = parser.img
+    return gifti_img.darrays[0].data
+
+
+def key_pressed(obj, event):
+    global show_m
+    key = obj.GetKeySym()
+    if key == 's' or key == 'S':
+        print('Saving image...')
+        show_m.save_screenshot('screenshot.png', magnification=4)
+        print('Image saved.')
+
+
+if __name__ == '__main__':
+    global show_m
+    
+    scene = window.Scene()
+    scene.background((1, 1, 1))
+    
+    destrieux_atlas = datasets.fetch_atlas_surf_destrieux()
+    
+    left_parcellation = destrieux_atlas.map_left
+    right_parcellation = destrieux_atlas.map_right
+
+    fsaverage = datasets.fetch_surf_fsaverage()
+
+    left_pial_mesh = surface.load_surf_mesh(fsaverage.pial_left)
+    left_sulc_points = points_from_gzipped_gifti(fsaverage.sulc_left)
+
+    right_pial_mesh = surface.load_surf_mesh(fsaverage.pial_right)
+    right_sulc_points = points_from_gzipped_gifti(fsaverage.sulc_right)
+    
+    labels = destrieux_atlas.labels
+    
+    min_val = np.nanmin(left_parcellation)
+    max_val = 1 + np.nanmax(left_parcellation)
+
+    left_coordinates = []
+    right_coordinates = []
+    connectome_colors = []
+    cmap = cm.get_cmap('gist_ncar')
+    t = time()
+    for i, label in enumerate(labels):
+        if 'Unknown' not in str(label):  # Omit the Unknown label.
+            # Compute mean location of vertices in label of index k
+            left_coordinates.append(np.mean(left_pial_mesh.coordinates[
+                left_parcellation == i, :], axis=0))
+            right_coordinates.append(np.mean(right_pial_mesh.coordinates[
+                right_parcellation == i, :], axis=0))
+            connectome_colors.append(
+                cmap((i - min_val) / (max_val - min_val))[:3])
+    print('Time: {}'.format(timedelta(seconds=time() - t)))
+    
+    # 3D coordinates of parcels
+    left_coordinates = np.array(left_coordinates)
+    right_coordinates = np.array(right_coordinates)
+    
+    left_nodes_actor = actor.sphere(left_coordinates, (1, 0, 0), opacity=.25)
+    right_nodes_actor = actor.sphere(right_coordinates, (1, 0, 0), opacity=.25)
+    
+    scene.add(left_nodes_actor)
+    scene.add(right_nodes_actor)
+    
+    window.show(scene)
