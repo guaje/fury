@@ -7,8 +7,8 @@ from matplotlib import cm
 from nibabel import gifti
 from nilearn import datasets, surface
 
-from fury import actor, ui, window
-from fury.lib import ImageData, PolyData, Texture, numpy_support
+from fury import window
+from fury.lib import PolyData
 from fury.utils import (
     get_actor_from_polydata,
     get_polydata_normals,
