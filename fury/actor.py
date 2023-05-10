@@ -53,9 +53,9 @@ from fury.lib import (
     TextureMapToPlane,
     Transform,
     TransformPolyDataFilter,
+    TriangleFilter,
     TubeFilter,
     VectorText,
-    TriangleFilter,
     numpy_support,
 )
 from fury.shaders import (
@@ -750,8 +750,6 @@ def streamtube(
     actor.GetProperty().BackfaceCullingOn()
     actor.GetProperty().SetOpacity(opacity)
 
-
-
     return actor
 
 
@@ -1001,7 +999,7 @@ def odf_slicer(
         it will be applied individually at each voxel.
     B_matrix : ndarray (n_coeffs, n_vertices)
         Optional SH to SF matrix for projecting `odfs` given in SH
-        coefficents on the `sphere`. If None, then the input is assumed
+        coefficients on the `sphere`. If None, then the input is assumed
         to be expressed in SF coefficients.
 
     Returns
@@ -1035,13 +1033,13 @@ def odf_slicer(
     if B_matrix is None:
         if len(vertices) != odfs.shape[-1]:
             raise ValueError(
-                'Invalid nunber of SF coefficients. '
+                'Invalid number of SF coefficients. '
                 'Expected {0}, got {1}.'.format(len(vertices), odfs.shape[-1])
             )
     else:
         if len(vertices) != B_matrix.shape[1]:
             raise ValueError(
-                'Invalid nunber of SH coefficients. '
+                'Invalid number of SH coefficients. '
                 'Expected {0}, got {1}.'.format(len(vertices), B_matrix.shape[1])
             )
 
@@ -1869,9 +1867,10 @@ def cylinder(
     radius=0.05,
     heights=1,
     capped=False,
-    resolution=6,
+    resolution=8,
     vertices=None,
     faces=None,
+    repeat_primitive=True,
 ):
     """Visualize one or many cylinder with different features.
 
@@ -1884,18 +1883,21 @@ def cylinder(
     colors : ndarray (N,3) or (N, 4) or tuple (3,) or tuple (4,)
         RGB or RGBA (for opacity) R, G, B and A should be at the range [0, 1].
     radius : float
-        cylinder radius, default: 1.
+        cylinder radius.
     heights : ndarray, shape (N)
-        The height of the arrow.
+        The height of the cylinder.
     capped : bool
         Turn on/off whether to cap cylinder with polygons. Default (False).
     resolution: int
-        Number of facets used to define cylinder.
+        Number of facets/sectors used to define cylinder.
     vertices : ndarray, shape (N, 3)
         The point cloud defining the sphere.
     faces : ndarray, shape (M, 3)
         If faces is None then a sphere is created based on theta and phi angles.
         If not then a sphere is created with the provided vertices and faces.
+    repeat_primitive: bool
+        If True, cylinder will be generated with primitives
+        If False, repeat_sources will be invoked to use VTK filters for cylinder.
 
     Returns
     -------
@@ -1913,26 +1915,53 @@ def cylinder(
     >>> # window.show(scene)
 
     """
-    if faces is None:
-        src = CylinderSource()
-        src.SetCapping(capped)
-        src.SetResolution(resolution)
-        src.SetRadius(radius)
-        rotate = np.array([[0, 1, 0, 0], [-1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
-    else:
-        src = None
-        rotate = None
+    if repeat_primitive:
 
-    cylinder_actor = repeat_sources(
-        centers=centers,
-        colors=colors,
-        directions=directions,
-        active_scalars=heights,
-        source=src,
-        vertices=vertices,
-        faces=faces,
-        orientation=rotate,
-    )
+        if resolution < 8:
+            # Sectors parameter should be greater than 7 in fp.prim_cylinder()
+            raise ValueError('resolution parameter should be greater than 7')
+
+        verts, faces = fp.prim_cylinder(
+            radius=radius,
+            sectors=resolution,
+            capped=capped,
+        )
+        res = fp.repeat_primitive(
+            verts,
+            faces,
+            centers=centers,
+            directions=directions,
+            colors=colors,
+            scales=heights,
+        )
+
+        big_verts, big_faces, big_colors, _ = res
+        prim_count = len(centers)
+        cylinder_actor = get_actor_from_primitive(
+            big_verts, big_faces, big_colors, prim_count=prim_count
+        )
+
+    else:
+        if faces is None:
+            src = CylinderSource()
+            src.SetCapping(capped)
+            src.SetResolution(resolution)
+            src.SetRadius(radius)
+            rotate = np.array([[0, 1, 0, 0], [-1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+        else:
+            src = None
+            rotate = None
+
+        cylinder_actor = repeat_sources(
+            centers=centers,
+            colors=colors,
+            directions=directions,
+            active_scalars=heights,
+            source=src,
+            vertices=vertices,
+            faces=faces,
+            orientation=rotate,
+        )
 
     return cylinder_actor
 
@@ -2193,7 +2222,7 @@ def arrow(
     faces=None,
     repeat_primitive=True,
 ):
-    """Visualize one or many arrows with differents features.
+    """Visualize one or many arrows with different features.
 
     Parameters
     ----------
@@ -2779,7 +2808,7 @@ def billboard(
         '''
         /* Billboard  vertex shader declaration */
         in vec3 center;
-        
+
         out vec3 centerVertexMCVSOutput;
         out vec3 normalizedVertexMCVSOutput;
         '''
@@ -2927,7 +2956,7 @@ def vector_text(
 
     texta.GetProperty().SetColor(color)
 
-    # Set ser rotation origin to the center of the text is following the camera
+    # Set rotation origin to the center of the text is following the camera
     if align_center or direction is None:
         trans_matrix.Translate(-np.array(textm.GetCenter()))
 
@@ -3071,6 +3100,7 @@ class Container:
         Default: (0, 0, 0, 0, 0, 0).
 
     """
+
     def __init__(self, layout=layout.Layout()):
         """
 
@@ -3679,7 +3709,7 @@ def markers(
         '''
         /* Billboard  vertex shader declaration */
         in vec3 center;
-        
+
         out vec3 centerVertexMCVSOutput;
         out vec3 normalizedVertexMCVSOutput;
         '''
