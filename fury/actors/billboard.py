@@ -30,10 +30,11 @@ class BillboardActor(Actor):
             big_verts, big_faces, colors=big_colors,
             prim_count=prim_count).GetMapper()
         self.__mapper.SetVBOShiftScaleMethod(False)
-        self.__mapper.GetProperty().BackfaceCullingOff()
         self.__mapper.Update()
         
         self.SetMapper(self.__mapper)
+        
+        self.GetProperty().BackfaceCullingOff()
         
         attribute_to_actor(self, big_centers, 'center')
         

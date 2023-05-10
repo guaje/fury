@@ -8,6 +8,7 @@ import numpy as np
 
 import fury.primitive as fp
 from fury import layout
+from fury.actors.billboard import BillboardActor
 from fury.actors.odf_slicer import OdfSlicerActor
 from fury.actors.peak import PeakActor
 from fury.colormap import colormap_lookup_table
@@ -2744,6 +2745,7 @@ def billboard(
     -------
     billboard_actor: Actor
     """
+    """
     verts, faces = fp.prim_square()
     res = fp.repeat_primitive(
         verts, faces, centers=centers, colors=colors, scales=scales
@@ -2761,6 +2763,7 @@ def billboard(
 
     bb_norm = import_fury_shader(os.path.join('utils',
                                               'billboard_normalization.glsl'))
+    """
 
     if bb_type.lower() == 'cylindrical_x':
         bb_type_sd = import_fury_shader(os.path.join('billboard',
@@ -2799,6 +2802,7 @@ def billboard(
         warnings.warn('Invalid option. The billboard will be generated '
                       'with the default spherical option. ', UserWarning)
 
+    """
     gl_position = \
         '''
         gl_Position = MCDCMatrix * vec4(vertexPositionMC, 1.);
@@ -2863,6 +2867,10 @@ def billboard(
                     block='light')
 
     return bb_actor
+    """
+    return BillboardActor(
+        centers, colors, scales, vs_dec=vs_dec, vs_impl=vs_impl,
+        gs_prog=gs_prog, fs_dec=fs_dec, fs_impl=fs_impl, bb_type=bb_type)
 
 
 def vector_text(
