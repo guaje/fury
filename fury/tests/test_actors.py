@@ -12,6 +12,7 @@ from fury import primitive as fp
 from fury import shaders, window
 from fury.actor import grid
 from fury.decorators import skip_linux, skip_osx, skip_win
+from fury.deprecator import ExpiredDeprecationError
 
 # Allow import, but disable doctests if we don't have dipy
 from fury.optpkg import optional_package
@@ -253,7 +254,7 @@ def test_contour_from_roi(interactive=False):
     ' vtkAssembly + actor opacity.',
 )
 def test_contour_from_label(interactive=False):
-    # Render volumne
+    # Render volume
     scene = window.Scene()
     data = np.zeros((50, 50, 50))
     data[5:15, 1:10, 25] = 1.0
@@ -359,6 +360,16 @@ def test_streamtube_and_line_actors():
     npt.assert_equal(mapper_code, file_code)
 
     npt.assert_equal(c3.GetProperty().GetRenderLinesAsTubes(), True)
+
+    c4 = actor.streamtube(lines, colors, replace_strips=False)
+
+    c5 = actor.streamtube(lines, colors, replace_strips=True)
+
+    strips4 = c4.GetMapper().GetInput().GetStrips().GetData().GetSize()
+    strips5 = c5.GetMapper().GetInput().GetStrips().GetData().GetSize()
+
+    npt.assert_equal(strips4 > 0, True)
+    npt.assert_equal(strips5 == 0, True)
 
 
 def simulated_bundle(no_streamlines=10, waves=False):
@@ -504,7 +515,7 @@ def test_odf_slicer(interactive=False):
     if interactive:
         window.show(scene)
 
-    # Test that the most basic odf_slicer instanciation works
+    # Test that the most basic odf_slicer instantiation works
     odf_actor = actor.odf_slicer(odfs)
     scene.clear()
     scene.add(odf_actor)
@@ -886,8 +897,8 @@ def test_points(interactive=False):
     npt.assert_equal(report.objects, 3)
 
 
-def test_labels(interactive=False):
-    npt.assert_warns(DeprecationWarning, actor.label, 'FURY Rocks')
+def test_vector_text(interactive=False):
+    npt.assert_raises(ExpiredDeprecationError, actor.label, 'FURY Rocks')
     text_actor = actor.vector_text('FURY Rocks', direction=None)
 
     scene = window.Scene()
@@ -1548,7 +1559,6 @@ def test_billboard_actor(interactive=False):
         float radius = 1.;
         if(len > radius)
             {discard;}
-
         vec3 normalizedPoint = normalize(vec3(point.xy, sqrt(1. - len)));
         vec3 direction = normalize(vec3(1., 1., 1.));
         float df_1 = max(0, dot(direction, normalizedPoint));
@@ -1560,13 +1570,67 @@ def test_billboard_actor(interactive=False):
         centers, colors=colors, scales=scales, fs_impl=fake_sphere
     )
     scene.add(billboard_actor)
-    scene.add(actor.axes())
+
     if interactive:
         window.show(scene)
 
     arr = window.snapshot(scene)
     report = window.analyze_snapshot(arr, colors=colors)
     npt.assert_equal(report.objects, 8)
+    scene.clear()
+
+    centers = np.array([[0, 0, 0], [-15, 15, -5], [10, -10, 5],
+                        [-30, 30, -10], [20, -20, 10]])
+    colors = np.array([[1, 1, 0], [0, 0, 1], [1, 0, 1],
+                       [1, 0, 0], [0, 1, 0]])
+    scales = [3, 1, 2, 1, 1.5]
+
+    b_point = """
+        float len = length(point);
+        float radius = .2;
+        if(len > radius)
+            {fragOutput0 = vec4(vec3(0,0,0), 1);}
+        else
+            {fragOutput0 = vec4(color, 1);}
+        """
+
+    b_type = ['spherical', 'cylindrical_x', 'cylindrical_y']
+    expected_val = [True, False, False]
+    rotations = [[87, 0, -87, 87], [87, 0, -87, 87], [0, 87, 87, -87]]
+    for i in range(3):
+        billboard = actor.billboard(centers, colors=colors, scales=scales,
+                                    bb_type=b_type[i], fs_impl=b_point)
+
+        scene.add(billboard)
+        if b_type[i] == 'spherical':
+            arr = window.snapshot(scene)
+            report = window.analyze_snapshot(arr, colors=255 * colors)
+            npt.assert_equal(report.colors_found, [True] * 5)
+
+        scene.pitch(rotations[i][0])
+        scene.yaw(rotations[i][1])
+        if interactive:
+            window.show(scene)
+
+        scene.reset_camera()
+        scene.reset_clipping_range()
+        arr = window.snapshot(scene, offscreen=True)
+        report = window.analyze_snapshot(arr, colors=255 * colors)
+        npt.assert_equal(report.colors_found, [True] * 5)
+
+        scene.pitch(rotations[i][2])
+        scene.yaw(rotations[i][3])
+        if interactive:
+            window.show(scene)
+
+        scene.reset_camera()
+        scene.reset_clipping_range()
+        arr = window.snapshot(scene, offscreen=True)
+        report = window.analyze_snapshot(arr, colors=255 * colors)
+        npt.assert_equal(report.colors_found, [expected_val[i]] * 5)
+
+        scene.yaw(-87)
+        scene.clear()
 
 
 @pytest.mark.skipif(
@@ -1668,6 +1732,45 @@ def test_marker_actor(interactive=False):
     colors = np.array([[0, 1, 0] for i in range(12)])
     report = window.analyze_snapshot(arr, colors=colors)
     npt.assert_equal(report.objects, 12)
+
+
+def test_ellipsoid_actor(interactive=False):
+    # number of axes does not match with number of centers
+    centers = [-1, 1, 0]
+    axes = [[[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+            [[1, 2, -2], [2, 1, 2], [2, -2, -1]]]
+    lengths = [[1, 1, 1]]
+    npt.assert_raises(ValueError, actor.ellipsoid, centers, axes, lengths)
+
+    # number of lengths does not match with number of centers
+    lengths = [[1, 1, 1], [1, 1, .5]]
+    npt.assert_raises(ValueError, actor.ellipsoid, centers, axes, lengths)
+
+    scene = window.Scene()
+    scene.background((0, 0, 0))
+
+    axes = np.array([[[-.6, .5, -.6], [-.8, -.4, .5], [-.1, -.7, -.7]],
+                     [[.1, .6, -.8], [.6, .5, .5], [-.8, .6, .3]],
+                     [[.7, .5, -.5], [0, -.7, -.7], [-.7, .6, -.5]],
+                     [[.7, -.3, -.6], [.2, -.8, .6], [.7, .6, .5]],
+                     [[1, 2, -2], [2, 1, 2], [2, -2, -1]],
+                     [[1, 0, 0], [0, 1, 0], [0, 0, 1]]])
+    lengths = np.array([[1, 1, 1], [1, 1, .5], [1, .5, .5],
+                        [1, .5, .25], [1, 1, .3], [1, .3, .3]])
+    centers = np.array([[-1, 1, 0], [0, 1, 0], [1, 1, 0],
+                        [-1, 0, 0], [0, 0, 0], [1, 0, 0]])
+    colors = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1],
+                       [1, 1, 0], [1, 0, 1], [0, 1, 1]])
+
+    ellipsoids = actor.ellipsoid(axes=axes, lengths=lengths, centers=centers,
+                              scales=1.0, colors=colors)
+    scene.add(ellipsoids)
+
+    if interactive:
+        window.show(scene)
+
+    report = window.analyze_scene(scene)
+    npt.assert_equal(report.actors, 1)
 
 
 def test_actors_primitives_count():
