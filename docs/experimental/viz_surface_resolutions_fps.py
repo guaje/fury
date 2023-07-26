@@ -68,14 +68,14 @@ def points_from_gzipped_gifti(fname):
 
 
 def timer_callback(_obj, _event):
-    global avg_fpss, fpss, prev_time, start_time, show_m
-    
+    global avg_fpss, fpss, prev_time, show_m, start_time
+
     fpss.append(show_m.frame_rate)
     fpss.pop(0)
-    
+
     show_m.scene.azimuth(5)
     show_m.render()
-    
+
     time_diff = timedelta(seconds=time() - start_time)
     # Runs for 10 seconds
     if time_diff.seconds > 10:
@@ -89,11 +89,11 @@ def timer_callback(_obj, _event):
 
 
 if __name__ == '__main__':
-    global avg_fpss, fpss, prev_time, start_time, show_m
-    
+    global avg_fpss, fpss, prev_time, show_m, start_time
+
     scene = window.Scene()
     scene.background((1, 1, 1))
-    
+
     fsaverage = datasets.fetch_surf_fsaverage(mesh='fsaverage3')
 
     left_pial_mesh = surface.load_surf_mesh(fsaverage.pial_left)
@@ -103,59 +103,59 @@ if __name__ == '__main__':
     right_pial_mesh = surface.load_surf_mesh(fsaverage.pial_right)
     right_sulc_points = points_from_gzipped_gifti(fsaverage.sulc_right)
     print(len(right_sulc_points))
-    
+
     print('Computing background colors...')
     t = time()
     left_colors = compute_background_colors(left_sulc_points)
     print('Time: {}'.format(timedelta(seconds=time() - t)))
-    
+
     t = time()
     right_colors = compute_background_colors(right_sulc_points)
     print('Time: {}'.format(timedelta(seconds=time() - t)))
-    
+
     left_hemi_actor = get_hemisphere_actor(
         fsaverage.pial_left, colors=left_colors)
 
     right_hemi_actor = get_hemisphere_actor(
         fsaverage.pial_right, colors=right_colors)
-    
+
     """
     left_hemi_actor.GetProperty().SetRepresentationToSurface()
     left_hemi_actor.GetProperty().EdgeVisibilityOn()
     left_hemi_actor.GetProperty().SetEdgeColor(0, 0, 0)
-    
+
     right_hemi_actor.GetProperty().SetRepresentationToSurface()
     right_hemi_actor.GetProperty().EdgeVisibilityOn()
     right_hemi_actor.GetProperty().SetEdgeColor(0, 0, 0)
     """
-    
+
     rotate(left_hemi_actor, rotation=(-80, 1, 0, 0))
     rotate(right_hemi_actor, rotation=(-80, 1, 0, 0))
-    
+
     scene.add(left_hemi_actor)
     scene.add(right_hemi_actor)
-    
+
     scene.reset_camera()
     scene.reset_clipping_range()
-    
+
     #window.show(scene)
-    
+
     show_m = window.ShowManager(
         scene=scene, size=(1920, 1080), reset_camera=False,
         order_transparent=True)
     show_m.initialize()
-    
+
     prev_time = 0
-    
+
     fps_len = 20
     fpss = [0] * fps_len
-    
+
     avg_fpss = []
 
     show_m.add_timer_callback(True, 1, timer_callback)
 
     start_time = time()
-    
+
     show_m.start()
-    
+
     print(f'Avg. FPS = {np.mean(avg_fpss)}')
