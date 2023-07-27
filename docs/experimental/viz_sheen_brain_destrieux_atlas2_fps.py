@@ -9,9 +9,6 @@ from nilearn import datasets, surface
 from nilearn.connectome import ConnectivityMeasure
 
 from fury import actor, ui, window
-from fury.colormap import distinguishable_colormap
-from fury.data import fetch_viz_cubemaps, read_viz_cubemap
-from fury.io import load_cubemap_texture
 from fury.lib import ImageData, PolyData, Texture, numpy_support
 from fury.material import manifest_principled
 from fury.utils import (
@@ -25,92 +22,6 @@ from fury.utils import (
     set_polydata_vertices,
     update_polydata_normals,
 )
-
-
-def change_slice_subsurface(slider):
-    global left_principled, right_principled
-    left_principled['subsurface'] = slider.value
-    right_principled['subsurface'] = slider.value
-
-
-def change_slice_metallic(slider):
-    global left_principled, right_principled
-    left_principled['metallic'] = slider.value
-    right_principled['metallic'] = slider.value
-
-
-def change_slice_specular(slider):
-    global left_hemi_actor, left_principled, right_hemi_actor, right_principled
-    left_principled['specular'] = slider.value
-    right_principled['specular'] = slider.value
-    left_hemi_actor.GetProperty().SetSpecular(slider.value)
-    right_hemi_actor.GetProperty().SetSpecular(slider.value)
-
-
-def change_slice_specular_tint(slider):
-    global left_principled, right_principled
-    left_principled['specular_tint'] = slider.value
-    right_principled['specular_tint'] = slider.value
-
-
-def change_slice_roughness(slider):
-    global left_principled, right_principled
-    left_principled['roughness'] = slider.value
-    right_principled['roughness'] = slider.value
-
-
-def change_slice_anisotropic(slider):
-    global left_principled, right_principled
-    left_principled['anisotropic'] = slider.value
-    right_principled['anisotropic'] = slider.value
-
-
-def change_slice_sheen(slider):
-    global left_principled, right_principled
-    left_principled['sheen'] = slider.value
-    right_principled['sheen'] = slider.value
-
-
-def change_slice_sheen_tint(slider):
-    global left_principled, right_principled
-    left_principled['sheen_tint'] = slider.value
-    right_principled['sheen_tint'] = slider.value
-
-
-def change_slice_clearcoat(slider):
-    global left_principled, right_principled
-    left_principled['clearcoat'] = slider.value
-    right_principled['clearcoat'] = slider.value
-
-
-def change_slice_clearcoat_gloss(slider):
-    global left_principled, right_principled
-    left_principled['clearcoat_gloss'] = slider.value
-    right_principled['clearcoat_gloss'] = slider.value
-
-
-def change_slice_aniso_x(slider):
-    global left_principled, right_principled
-    left_principled['anisotropic_direction'][0] = slider.value
-    right_principled['anisotropic_direction'][0] = slider.value
-
-
-def change_slice_aniso_y(slider):
-    global left_principled, right_principled
-    left_principled['anisotropic_direction'][1] = slider.value
-    right_principled['anisotropic_direction'][1] = slider.value
-
-
-def change_slice_aniso_z(slider):
-    global left_principled, right_principled
-    left_principled['anisotropic_direction'][2] = slider.value
-    right_principled['anisotropic_direction'][2] = slider.value
-
-
-def change_slice_opacity(slider):
-    global left_hemi_actor, right_hemi_actor
-    left_hemi_actor.GetProperty().SetOpacity(slider.value)
-    right_hemi_actor.GetProperty().SetOpacity(slider.value)
 
 
 def colors_from_pre_cmap(textures, networks, pre_cmap, bg_colors=None):
@@ -216,63 +127,13 @@ def timer_callback(_obj, _event):
         prev_time = time_diff.seconds
 
 
-def win_callback(obj, event):
-    global control_panel, params_panel, principled_panel, size
-    if size != obj.GetSize():
-        size_old = size
-        size = obj.GetSize()
-        size_change = [size[0] - size_old[0], 0]
-        params_panel.re_align(size_change)
-        principled_panel.re_align(size_change)
-        control_panel.re_align(size_change)
-
-
 if __name__ == '__main__':
-    global avg_fpss, control_panel, fpss, left_hemi_actor, left_principled, \
-        params_panel, prev_time, principled_panel, right_hemi_actor, \
-        right_principled, show_m, size, start_time
-
-    fetch_viz_cubemaps()
-
-    # texture_name = 'skybox'
-    texture_name = 'brudslojan'
-    textures = read_viz_cubemap(texture_name)
-
-    cubemap = load_cubemap_texture(textures)
-
-    """
-    img_shape = (1024, 1024)
-
-    # Flip horizontally
-    img_grad = np.flip(np.tile(np.linspace(0, 255, num=img_shape[0]),
-                               (img_shape[1], 1)).astype(np.uint8), axis=1)
-    cubemap_side_img = np.stack((img_grad,) * 3, axis=-1)
-
-    cubemap_top_img = np.ones((img_shape[0], img_shape[1], 3)).astype(
-        np.uint8) * 255
-
-    cubemap_bottom_img = np.zeros((img_shape[0], img_shape[1], 3)).astype(
-        np.uint8)
-
-    cubemap_imgs = [cubemap_side_img, cubemap_side_img, cubemap_top_img,
-                    cubemap_bottom_img, cubemap_side_img, cubemap_side_img]
-
-    cubemap = get_cubemap_from_ndarrays(cubemap_imgs, flip=False)
-    """
-
-    # cubemap.RepeatOff()
-    # cubemap.EdgeClampOn()
+    global avg_fpss, fpss, prev_time, show_m, start_time
 
     scene = window.Scene()
 
-    # scene = window.Scene(skybox=cubemap)
-    # scene.skybox(gamma_correct=False)
-
     scene_bg_color = (1, 1, 1)
     scene.background(scene_bg_color)
-
-    # Scene rotation for brudslojan texture
-    # scene.yaw(-110)
 
     destrieux_atlas = datasets.fetch_atlas_surf_destrieux()
     destrieux_labels = destrieux_atlas.labels
@@ -312,15 +173,6 @@ if __name__ == '__main__':
 
     right_pial_mesh = surface.load_surf_mesh(fsaverage.pial_right)
     right_sulc_points = points_from_gzipped_gifti(fsaverage.sulc_right)
-
-    """
-    from nilearn.plotting import plot_surf_roi
-    import matplotlib.pyplot as plt
-
-    plot_surf_roi(fsaverage.pial_left, left_parcellation,
-                  bg_map=fsaverage.sulc_left, bg_on_data=True, darkness=.5)
-    plt.show()
-    """
 
     print('Computing background colors...')
     t = time()
@@ -573,166 +425,6 @@ if __name__ == '__main__':
     show_m = window.ShowManager(scene=scene, size=(1920, 1080),
                                 reset_camera=False, order_transparent=True)
     show_m.initialize()
-
-    principled_panel = ui.Panel2D(
-        (380, 500), position=(5, 5), color=(.25, .25, .25), opacity=.75,
-        align='right')
-
-    panel_label_principled_brdf = ui.TextBlock2D(text='Principled BRDF',
-                                                 font_size=18, bold=True)
-    slider_label_subsurface = ui.TextBlock2D(text='Subsurface', font_size=16)
-    slider_label_metallic = ui.TextBlock2D(text='Metallic', font_size=16)
-    slider_label_specular = ui.TextBlock2D(text='Specular', font_size=16)
-    slider_label_specular_tint = ui.TextBlock2D(text='Specular Tint',
-                                                font_size=16)
-    slider_label_roughness = ui.TextBlock2D(text='Roughness', font_size=16)
-    slider_label_anisotropic = ui.TextBlock2D(text='Anisotropic', font_size=16)
-    slider_label_sheen = ui.TextBlock2D(text='Sheen', font_size=16)
-    slider_label_sheen_tint = ui.TextBlock2D(text='Sheen Tint', font_size=16)
-    slider_label_clearcoat = ui.TextBlock2D(text='Clearcoat', font_size=16)
-    slider_label_clearcoat_gloss = ui.TextBlock2D(text='Clearcoat Gloss',
-                                                  font_size=16)
-
-    label_pad_x = .06
-
-    principled_panel.add_element(panel_label_principled_brdf, (.02, .95))
-    principled_panel.add_element(slider_label_subsurface, (label_pad_x, .86))
-    principled_panel.add_element(slider_label_metallic, (label_pad_x, .77))
-    principled_panel.add_element(slider_label_specular, (label_pad_x, .68))
-    principled_panel.add_element(slider_label_specular_tint,
-                                 (label_pad_x, .59))
-    principled_panel.add_element(slider_label_roughness, (label_pad_x, .5))
-    principled_panel.add_element(slider_label_anisotropic, (label_pad_x, .41))
-    principled_panel.add_element(slider_label_sheen, (label_pad_x, .32))
-    principled_panel.add_element(slider_label_sheen_tint, (label_pad_x, .23))
-    principled_panel.add_element(slider_label_clearcoat, (label_pad_x, .14))
-    principled_panel.add_element(slider_label_clearcoat_gloss,
-                                 (label_pad_x, .05))
-
-    length = 200
-    text_template = '{value:.1f}'
-
-    slider_slice_subsurface = ui.LineSlider2D(
-        initial_value=principled_params['subsurface'], max_value=1,
-        length=length, text_template=text_template)
-    slider_slice_metallic = ui.LineSlider2D(
-        initial_value=principled_params['metallic'], max_value=1,
-        length=length, text_template=text_template)
-    slider_slice_specular = ui.LineSlider2D(
-        initial_value=principled_params['specular'], max_value=1,
-        length=length, text_template=text_template)
-    slider_slice_specular_tint = ui.LineSlider2D(
-        initial_value=principled_params['specular_tint'], max_value=1,
-        length=length, text_template=text_template)
-    slider_slice_roughness = ui.LineSlider2D(
-        initial_value=principled_params['roughness'], max_value=1,
-        length=length, text_template=text_template)
-    slider_slice_anisotropic = ui.LineSlider2D(
-        initial_value=principled_params['anisotropic'], max_value=1,
-        length=length, text_template=text_template)
-    slider_slice_sheen = ui.LineSlider2D(
-        initial_value=principled_params['sheen'], max_value=1, length=length,
-        text_template=text_template)
-    slider_slice_sheen_tint = ui.LineSlider2D(
-        initial_value=principled_params['sheen_tint'], max_value=1,
-        length=length, text_template=text_template)
-    slider_slice_clearcoat = ui.LineSlider2D(
-        initial_value=principled_params['clearcoat'], max_value=1,
-        length=length, text_template=text_template)
-    slider_slice_clearcoat_gloss = ui.LineSlider2D(
-        initial_value=principled_params['clearcoat_gloss'], max_value=1,
-        length=length, text_template=text_template)
-
-    slider_slice_subsurface.on_change = change_slice_subsurface
-    slider_slice_metallic.on_change = change_slice_metallic
-    slider_slice_specular.on_change = change_slice_specular
-    slider_slice_specular_tint.on_change = change_slice_specular_tint
-    slider_slice_roughness.on_change = change_slice_roughness
-    slider_slice_anisotropic.on_change = change_slice_anisotropic
-    slider_slice_sheen.on_change = change_slice_sheen
-    slider_slice_sheen_tint.on_change = change_slice_sheen_tint
-    slider_slice_clearcoat.on_change = change_slice_clearcoat
-    slider_slice_clearcoat_gloss.on_change = change_slice_clearcoat_gloss
-
-    slice_pad_x = .4
-
-    principled_panel.add_element(slider_slice_subsurface, (slice_pad_x, .86))
-    principled_panel.add_element(slider_slice_metallic, (slice_pad_x, .77))
-    principled_panel.add_element(slider_slice_specular, (slice_pad_x, .68))
-    principled_panel.add_element(slider_slice_specular_tint,
-                                 (slice_pad_x, .59))
-    principled_panel.add_element(slider_slice_roughness, (slice_pad_x, .5))
-    principled_panel.add_element(slider_slice_anisotropic, (slice_pad_x, .41))
-    principled_panel.add_element(slider_slice_sheen, (slice_pad_x, .32))
-    principled_panel.add_element(slider_slice_sheen_tint, (slice_pad_x, .23))
-    principled_panel.add_element(slider_slice_clearcoat, (slice_pad_x, .14))
-    principled_panel.add_element(slider_slice_clearcoat_gloss,
-                                 (slice_pad_x, .05))
-
-    #scene.add(principled_panel)
-
-    params_panel = ui.Panel2D((380, 200), position=(5, 510),
-                              color=(.25, .25, .25), opacity=.75,
-                              align='right')
-
-    panel_label_params = ui.TextBlock2D(text='Parameters', font_size=18,
-                                        bold=True)
-    section_label_aniso_dir = ui.TextBlock2D(text='Anisotropic Direction',
-                                             font_size=16, bold=True)
-    slider_label_aniso_x = ui.TextBlock2D(text='X', font_size=16)
-    slider_label_aniso_y = ui.TextBlock2D(text='Y', font_size=16)
-    slider_label_aniso_z = ui.TextBlock2D(text='Z', font_size=16)
-
-    params_panel.add_element(panel_label_params, (.02, .88))
-    params_panel.add_element(section_label_aniso_dir, (.04, .69))
-    params_panel.add_element(slider_label_aniso_x, (label_pad_x, .5))
-    params_panel.add_element(slider_label_aniso_y, (label_pad_x, .31))
-    params_panel.add_element(slider_label_aniso_z, (label_pad_x, .12))
-
-    slider_slice_aniso_x = ui.LineSlider2D(
-        initial_value=principled_params['anisotropic_direction'][0],
-        min_value=-1, max_value=1, length=length, text_template=text_template)
-    slider_slice_aniso_y = ui.LineSlider2D(
-        initial_value=principled_params['anisotropic_direction'][1],
-        min_value=-1, max_value=1, length=length, text_template=text_template)
-    slider_slice_aniso_z = ui.LineSlider2D(
-        initial_value=principled_params['anisotropic_direction'][2],
-        min_value=-1, max_value=1, length=length, text_template=text_template)
-
-    slider_slice_aniso_x.on_change = change_slice_aniso_x
-    slider_slice_aniso_y.on_change = change_slice_aniso_y
-    slider_slice_aniso_z.on_change = change_slice_aniso_z
-
-    params_panel.add_element(slider_slice_aniso_x, (slice_pad_x, .5))
-    params_panel.add_element(slider_slice_aniso_y, (slice_pad_x, .31))
-    params_panel.add_element(slider_slice_aniso_z, (slice_pad_x, .12))
-
-    #scene.add(params_panel)
-
-    control_panel = ui.Panel2D((380, 80), position=(5, 715),
-                               color=(.25, .25, .25), opacity=.75,
-                               align='right')
-
-    panel_label_control = ui.TextBlock2D(text='Control', font_size=18,
-                                         bold=True)
-    slider_label_opacity = ui.TextBlock2D(text='Opacity', font_size=16)
-
-    control_panel.add_element(panel_label_control, (.02, .7))
-    control_panel.add_element(slider_label_opacity, (label_pad_x, .3))
-
-    slider_slice_opacity = ui.LineSlider2D(
-        initial_value=opacity, max_value=1, length=length,
-        text_template=text_template)
-
-    slider_slice_opacity.on_change = change_slice_opacity
-
-    control_panel.add_element(slider_slice_opacity, (slice_pad_x, .3))
-
-    #scene.add(control_panel)
-
-    size = scene.GetSize()
-
-    show_m.add_window_callback(win_callback)
 
     prev_time = 0
 
