@@ -115,7 +115,7 @@ def timer_callback(_obj, _event):
     n_secs = 10
 
     time_diff = timedelta(seconds=time() - start_time)
-    tmp = np.sin(time_diff.seconds / n_secs * 360) + 1.5
+    zoom_lvl = np.sin(time_diff.seconds / n_secs * 360) + 1.5
 
     show_m.scene.azimuth(5)
 
@@ -129,7 +129,7 @@ def timer_callback(_obj, _event):
             avg_fps = np.mean(fpss)
             print(f'{time_diff} - {np.rint(avg_fps)} fps')
             avg_fpss.append(avg_fps)
-            show_m.scene.zoom(tmp)
+            show_m.scene.zoom(zoom_lvl)
         prev_time = time_diff.seconds
 
 
@@ -285,46 +285,6 @@ if __name__ == '__main__':
 
     scene.add(edges_actor)
 
-    """
-    import matplotlib.pyplot as plt
-    from matplotlib.cm import ScalarMappable
-    from matplotlib.colors import Normalize, LinearSegmentedColormap
-
-    bel_thr_ratio = thr / max_val
-    abo_thr_ratio = 1 - bel_thr_ratio
-    num_pos_cmap_colors = pos_edges_cmap.N
-    num_pos_cmap_grays = np.round(
-        bel_thr_ratio * num_pos_cmap_colors / abo_thr_ratio).astype(int)
-    bel_thr_cmap_list = [(.5, .5, .5, 1)] * num_pos_cmap_grays
-
-    num_ticks = 5
-    ticks = np.linspace(0, max_val, num_ticks)
-
-    norm = Normalize(vmin=0, vmax=max_val)
-    cmap_list = []
-    # for i in range(neg_edges_cmap.N):
-    #    cmap_list.append(neg_edges_cmap(i))
-    cmap_list.extend(bel_thr_cmap_list)
-    for i in range(pos_edges_cmap.N):
-        cmap_list.append(pos_edges_cmap(i))
-    colorbar_cmap = LinearSegmentedColormap.from_list(
-        'Custom cmap', cmap_list, N=len(cmap_list))
-
-    bounds = np.linspace(0, max_val, colorbar_cmap.N)
-
-    proxy_mappable = ScalarMappable(cmap=colorbar_cmap, norm=norm)
-    proxy_mappable.set_array(valid_corr_values)
-
-    figsize = [4.7, 4]
-    figure = plt.figure(figsize=figsize)
-
-    cbar_tick_format = '%.2g'
-    cbar = figure.colorbar(
-        proxy_mappable, ticks=ticks, boundaries=bounds, spacing='proportional',
-        format=cbar_tick_format, orientation='vertical')
-    plt.show()
-    """
-
     nodes_coords = []
     nodes_colors = []
     for i in range(num_top_net):
@@ -380,6 +340,7 @@ if __name__ == '__main__':
     right_hemi_actor = get_hemisphere_actor(
         fsaverage.pial_right, colors=right_colors)
 
+    """
     principled_params = {
         'subsurface': 0, 'metallic': 0, 'specular': 0, 'specular_tint': 0,
         'roughness': 0, 'anisotropic': 0, 'anisotropic_direction': [0, 1, .5],
@@ -389,6 +350,13 @@ if __name__ == '__main__':
         left_hemi_actor, **principled_params)
     right_principled = manifest_principled(
         right_hemi_actor, **principled_params)
+    """
+
+    #left_hemi_actor.GetProperty().SetInterpolationToFlat()
+    #right_hemi_actor.GetProperty().SetInterpolationToFlat()
+
+    #left_hemi_actor.GetProperty().SetInterpolationToGouraud()
+    #right_hemi_actor.GetProperty().SetInterpolationToGouraud()
 
     opacity = .3
     left_hemi_actor.GetProperty().SetOpacity(opacity)
