@@ -8,7 +8,7 @@ from nibabel import gifti
 from nilearn import datasets, surface
 from nilearn.connectome import ConnectivityMeasure
 
-from fury import actor, ui, window
+from fury import actor, window
 from fury.lib import ImageData, PolyData, Texture, numpy_support
 from fury.material import manifest_principled
 from fury.utils import (
@@ -67,8 +67,8 @@ def get_cubemap_from_ndarrays(array, flip=True):
             vtk_arr = numpy_support.numpy_to_vtk(np.flip(
                 img.swapaxes(0, 1), axis=1).reshape((-1, 3), order='F'))
         else:
-            vtk_arr = numpy_support.numpy_to_vtk(img.reshape((-1, 3),
-                                                             order='F'))
+            vtk_arr = numpy_support.numpy_to_vtk(
+                img.reshape((-1, 3), order='F'))
         vtk_arr.SetName('Image')
         vtk_img.GetPointData().AddArray(vtk_arr)
         vtk_img.GetPointData().SetActiveScalars('Image')
@@ -87,7 +87,7 @@ def get_hemisphere_actor(fname, colors=None, auto_normals='vtk'):
         normals = normals_from_v_f(points, triangles)
         set_polydata_normals(polydata, normals)
     if colors is not None:
-        if type(colors) == str:
+        if isinstance(colors, str):
             if colors.lower() == 'normals':
                 if auto_normals.lower() == 'vtk':
                     normals = get_polydata_normals(polydata)
@@ -112,18 +112,24 @@ def timer_callback(_obj, _event):
     fpss.append(show_m.frame_rate)
     fpss.pop(0)
 
-    show_m.scene.azimuth(5)
-    show_m.render()
+    n_secs = 10
 
     time_diff = timedelta(seconds=time() - start_time)
-    # Runs for 10 seconds
-    if time_diff.seconds > 10:
+    tmp = np.sin(time_diff.seconds / n_secs * 360) + 1.5
+
+    show_m.scene.azimuth(5)
+
+    show_m.render()
+
+    # Runs for X seconds
+    if time_diff.seconds > n_secs:
         show_m.exit()
     else:
         if time_diff.seconds > prev_time:
             avg_fps = np.mean(fpss)
             print(f'{time_diff} - {np.rint(avg_fps)} fps')
             avg_fpss.append(avg_fps)
+            show_m.scene.zoom(tmp)
         prev_time = time_diff.seconds
 
 
@@ -194,8 +200,9 @@ if __name__ == '__main__':
 
     #n_top_net_cmap = cm.get_cmap('Paired')
     n_top_net_cmap = cm.get_cmap('tab20b')
-    n_top_net_colors = np.array([n_top_net_cmap(i / (num_top_net - 1))[:3]
-                                 for i in range(num_top_net)])
+    n_top_net_colors = np.array([
+        n_top_net_cmap(i / (num_top_net - 1))[:3]
+        for i in range(num_top_net)])
 
     fmri_data = datasets.fetch_surf_nki_enhanced(n_subjects=1)
     left_ts = surface.load_surf_data(fmri_data.func_left[0])
@@ -211,13 +218,13 @@ if __name__ == '__main__':
         label_ts = left_ts[n_top_left_parcellation == label, :]
         time_series[:, idx] = np.mean(label_ts, axis=0)
         coords = left_pial_mesh.coordinates[
-                 n_top_left_parcellation == label, :]
+            n_top_left_parcellation == label, :]
         label_coords[idx, :] = np.mean(coords, axis=0)
         # Right time series and node coordinates per label
         label_ts = right_ts[n_top_right_parcellation == label, :]
         time_series[:, idx + num_top_net] = np.mean(label_ts, axis=0)
         coords = right_pial_mesh.coordinates[
-                   n_top_right_parcellation == label, :]
+            n_top_right_parcellation == label, :]
         label_coords[idx + num_top_net, :] = np.mean(coords, axis=0)
 
     corr_measure = ConnectivityMeasure(kind='correlation')
@@ -273,8 +280,8 @@ if __name__ == '__main__':
     vis_colors = np.round(np.array(vis_colors) * 255).astype(int)
     """
 
-    edges_actor = actor.streamtube(edges_coords, edges_colors, opacity=.5,
-                                   linewidth=.5)
+    edges_actor = actor.streamtube(
+        edges_coords, edges_colors, opacity=.5, linewidth=.5)
 
     scene.add(edges_actor)
 
@@ -300,8 +307,8 @@ if __name__ == '__main__':
     cmap_list.extend(bel_thr_cmap_list)
     for i in range(pos_edges_cmap.N):
         cmap_list.append(pos_edges_cmap(i))
-    colorbar_cmap = LinearSegmentedColormap.from_list('Custom cmap', cmap_list,
-                                                      N=len(cmap_list))
+    colorbar_cmap = LinearSegmentedColormap.from_list(
+        'Custom cmap', cmap_list, N=len(cmap_list))
 
     bounds = np.linspace(0, max_val, colorbar_cmap.N)
 
@@ -312,9 +319,9 @@ if __name__ == '__main__':
     figure = plt.figure(figsize=figsize)
 
     cbar_tick_format = '%.2g'
-    cbar = figure.colorbar(proxy_mappable, ticks=ticks, boundaries=bounds,
-                           spacing='proportional', format=cbar_tick_format,
-                           orientation='vertical')
+    cbar = figure.colorbar(
+        proxy_mappable, ticks=ticks, boundaries=bounds, spacing='proportional',
+        format=cbar_tick_format, orientation='vertical')
     plt.show()
     """
 
@@ -359,8 +366,8 @@ if __name__ == '__main__':
 
     #left_colors = np.hstack((left_colors, left_opacities[:, np.newaxis]))
 
-    left_hemi_actor = get_hemisphere_actor(fsaverage.pial_left,
-                                           colors=left_colors)
+    left_hemi_actor = get_hemisphere_actor(
+        fsaverage.pial_left, colors=left_colors)
 
     t = time()
     right_colors = colors_from_pre_cmap(
@@ -370,13 +377,13 @@ if __name__ == '__main__':
 
     #right_colors = np.hstack((right_colors, right_opacities[:, np.newaxis]))
 
-    right_hemi_actor = get_hemisphere_actor(fsaverage.pial_right,
-                                            colors=right_colors)
+    right_hemi_actor = get_hemisphere_actor(
+        fsaverage.pial_right, colors=right_colors)
 
-    principled_params = {'subsurface': 0, 'metallic': 0, 'specular': 0,
-                         'specular_tint': 0, 'roughness': 0, 'anisotropic': 0,
-                         'anisotropic_direction': [0, 1, .5], 'sheen': 1,
-                         'sheen_tint': 1, 'clearcoat': 0, 'clearcoat_gloss': 0}
+    principled_params = {
+        'subsurface': 0, 'metallic': 0, 'specular': 0, 'specular_tint': 0,
+        'roughness': 0, 'anisotropic': 0, 'anisotropic_direction': [0, 1, .5],
+        'sheen': 1, 'sheen_tint': 1, 'clearcoat': 0, 'clearcoat_gloss': 0}
 
     left_principled = manifest_principled(
         left_hemi_actor, **principled_params)
@@ -390,35 +397,13 @@ if __name__ == '__main__':
     scene.add(left_hemi_actor)
     scene.add(right_hemi_actor)
 
-    view = 'posterior'
-    if view == 'dorsal' or view == 'top':
-        pass
-    elif view == 'anterior' or view == 'front':
-        scene.roll(180)
-        scene.pitch(80)
-    elif view == 'posterior' or view == 'back':
-        rotate(edges_actor, rotation=(-80, 1, 0, 0))
-        rotate(nodes_actor, rotation=(-80, 1, 0, 0))
-        rotate(left_hemi_actor, rotation=(-80, 1, 0, 0))
-        rotate(right_hemi_actor, rotation=(-80, 1, 0, 0))
-    elif view == 'left':
-        scene.roll(90)
-        scene.pitch(80)
-    elif view == 'right':
-        scene.roll(270)
-        scene.pitch(80)
-    elif view == 'top left':
-        scene.roll(135)
-        scene.pitch(80)
+    rotate(edges_actor, rotation=(-80, 1, 0, 0))
+    rotate(nodes_actor, rotation=(-80, 1, 0, 0))
+    rotate(left_hemi_actor, rotation=(-80, 1, 0, 0))
+    rotate(right_hemi_actor, rotation=(-80, 1, 0, 0))
 
     scene.reset_camera()
     scene.reset_clipping_range()
-
-    # Dorsal view
-    scene.zoom(1.5)
-
-    # Left view
-    #scene.zoom(1.6)
 
     #window.show(scene)
 
