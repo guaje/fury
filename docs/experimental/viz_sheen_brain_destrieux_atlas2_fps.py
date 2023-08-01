@@ -358,6 +358,9 @@ if __name__ == '__main__':
     #left_hemi_actor.GetProperty().SetInterpolationToGouraud()
     #right_hemi_actor.GetProperty().SetInterpolationToGouraud()
 
+    left_hemi_actor.GetProperty().SetInterpolationToPhong()
+    right_hemi_actor.GetProperty().SetInterpolationToPhong()
+
     opacity = .3
     left_hemi_actor.GetProperty().SetOpacity(opacity)
     right_hemi_actor.GetProperty().SetOpacity(opacity)
