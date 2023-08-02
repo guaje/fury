@@ -1,4 +1,5 @@
 import gzip
+import os
 from datetime import timedelta
 from time import time
 
@@ -9,8 +10,13 @@ from nilearn import datasets, surface
 from nilearn.connectome import ConnectivityMeasure
 
 from fury import actor, window
-from fury.lib import ImageData, PolyData, Texture, numpy_support
-from fury.material import manifest_principled
+from fury.lib import VTK_OBJECT, PolyData, calldata_type
+from fury.shaders import (
+    add_shader_callback,
+    compose_shader,
+    import_fury_shader,
+    shader_to_actor,
+)
 from fury.utils import (
     get_actor_from_polydata,
     get_polydata_normals,
@@ -56,26 +62,6 @@ def compute_background_colors(bg_data, bg_cmap='gray_r'):
     return bg_colors
 
 
-def get_cubemap_from_ndarrays(array, flip=True):
-    texture = Texture()
-    texture.CubeMapOn()
-    for idx, img in enumerate(array):
-        vtk_img = ImageData()
-        vtk_img.SetDimensions(img.shape[1], img.shape[0], 1)
-        if flip:
-            # Flip horizontally
-            vtk_arr = numpy_support.numpy_to_vtk(np.flip(
-                img.swapaxes(0, 1), axis=1).reshape((-1, 3), order='F'))
-        else:
-            vtk_arr = numpy_support.numpy_to_vtk(
-                img.reshape((-1, 3), order='F'))
-        vtk_arr.SetName('Image')
-        vtk_img.GetPointData().AddArray(vtk_arr)
-        vtk_img.GetPointData().SetActiveScalars('Image')
-        texture.SetInputDataObject(idx, vtk_img)
-    return texture
-
-
 def get_hemisphere_actor(fname, colors=None, auto_normals='vtk'):
     points, triangles = surface.load_surf_mesh(fname)
     polydata = PolyData()
@@ -104,6 +90,94 @@ def points_from_gzipped_gifti(fname):
     parser.parse(as_bytes)
     gifti_img = parser.img
     return gifti_img.darrays[0].data
+
+
+def stylize_actor_with_sheen(actor, sheen=1, sheen_tint=1):
+    sheen_params = {'sheen': sheen, 'sheen_tint': sheen_tint}
+
+    @calldata_type(VTK_OBJECT)
+    def uniforms_callback(_caller, _event, calldata=None):
+        if calldata is not None:
+            calldata.SetUniformf('sheen', sheen_params['sheen'])
+            calldata.SetUniformf('sheenTint', sheen_params['sheen_tint'])
+
+    add_shader_callback(actor, uniforms_callback)
+
+    uniforms = \
+    """
+    uniform float sheen;
+    uniform float sheenTint;
+    """
+
+    pow5 = import_fury_shader(os.path.join('utils', 'pow5.glsl'))
+
+    gamma_to_linear = import_fury_shader(
+        os.path.join('lighting', 'gamma_to_linear.frag')
+    )
+
+    cie_color_tint = import_fury_shader(
+        os.path.join('lighting', 'cie_color_tint.frag')
+    )
+
+    schlick_weight = import_fury_shader(
+        os.path.join('lighting', 'schlick_weight.frag')
+    )
+
+    sheen = import_fury_shader(
+        os.path.join('lighting', 'principled', 'sheen.frag')
+    )
+
+    fs_dec = compose_shader([
+        uniforms, pow5, gamma_to_linear, cie_color_tint, schlick_weight, sheen
+    ])
+
+    shader_to_actor(actor, 'fragment', decl_code=fs_dec)
+
+    normal = 'vec3 normal = normalVCVSOutput;'
+    view = 'vec3 view = normalize(-vertexVC.xyz);'
+    dot_n_v = 'float dotNV = clamp(dot(normal, view), 1e-5, 1);'
+
+    dot_n_v_validation = \
+    """
+    if(dotNV < 0)
+        fragOutput0 = vec4(vec3(0), opacity);
+    """
+
+    linear_color = 'vec3 linColor = gamma2Linear(diffuseColor);'
+
+    tint = 'vec3 tint = calculateTint(linColor);'
+
+    fsw = 'float fsw = schlickWeight(dotNV);'
+
+    sheen_rad = \
+    """
+    vec3 sheenRad = evaluateSheen(sheen, sheenTint, tint, fsw);
+    """
+
+    # NOTE: Here's the sheen modification
+    frag_output = \
+    """
+    float len = length(sheenRad);
+    //fragOutput0 = vec4(sheenRad, opacity);
+    //fragOutput0 = vec4(sheenRad, len);
+    if(len < .1)
+    {
+        discard;
+    }
+    else
+    {
+        fragOutput0 = vec4(sheenRad, len);
+    }
+    """
+
+    fs_impl = compose_shader([
+        normal, view, dot_n_v, dot_n_v_validation, linear_color, tint, fsw,
+        sheen_rad, frag_output
+    ])
+
+    shader_to_actor(actor, 'fragment', impl_code=fs_impl, block='light')
+
+    return sheen_params
 
 
 def timer_callback(_obj, _event):
@@ -340,28 +414,13 @@ if __name__ == '__main__':
     right_hemi_actor = get_hemisphere_actor(
         fsaverage.pial_right, colors=right_colors)
 
-    """
-    principled_params = {
-        'subsurface': 0, 'metallic': 0, 'specular': 0, 'specular_tint': 0,
-        'roughness': 0, 'anisotropic': 0, 'anisotropic_direction': [0, 1, .5],
-        'sheen': 1, 'sheen_tint': 1, 'clearcoat': 0, 'clearcoat_gloss': 0}
+    sheen_params = {'sheen': 1, 'sheen_tint': 1}
 
-    left_principled = manifest_principled(
-        left_hemi_actor, **principled_params)
-    right_principled = manifest_principled(
-        right_hemi_actor, **principled_params)
-    """
+    left_hemi_style = stylize_actor_with_sheen(left_hemi_actor, **sheen_params)
+    right_hemi_style = stylize_actor_with_sheen(
+        right_hemi_actor, **sheen_params)
 
-    #left_hemi_actor.GetProperty().SetInterpolationToFlat()
-    #right_hemi_actor.GetProperty().SetInterpolationToFlat()
-
-    #left_hemi_actor.GetProperty().SetInterpolationToGouraud()
-    #right_hemi_actor.GetProperty().SetInterpolationToGouraud()
-
-    left_hemi_actor.GetProperty().SetInterpolationToPhong()
-    right_hemi_actor.GetProperty().SetInterpolationToPhong()
-
-    opacity = .3
+    opacity = 0
     left_hemi_actor.GetProperty().SetOpacity(opacity)
     right_hemi_actor.GetProperty().SetOpacity(opacity)
 
