@@ -1,40 +1,35 @@
-from fury import actor, window
-from fury.data import read_viz_textures
-from vtk.util import numpy_support
-
+import os
 
 import numpy as np
-import os
-import vtk
 
-
-def get_cubemap(files_names):
-    texture = vtk.vtkTexture()
-    texture.CubeMapOn()
-    for idx, fn in enumerate(files_names):
-        if not os.path.isfile(fn):
-            print('Nonexistent texture file:', fn)
-            return texture
-        else:
-            # Read the images
-            reader_factory = vtk.vtkImageReader2Factory()
-            img_reader = reader_factory.CreateImageReader2(fn)
-            img_reader.SetFileName(fn)
-
-            flip = vtk.vtkImageFlip()
-            flip.SetInputConnection(img_reader.GetOutputPort())
-            flip.SetFilteredAxis(1)  # flip y axis
-            texture.SetInputConnection(idx, flip.GetOutputPort(0))
-    return texture
+from fury import actor, window
+from fury.data import fetch_viz_cubemaps, read_viz_cubemap, read_viz_textures
+from fury.io import load_cubemap_texture
+from fury.lib import (
+    Actor,
+    FloatArray,
+    ImageReader2Factory,
+    NamedColors,
+    ParametricFunctionSource,
+    ParametricSuperEllipsoid,
+    PNGReader,
+    Points,
+    PolyData,
+    PolyDataMapper,
+    ProbeFilter,
+    Texture,
+    WarpScalar,
+    numpy_support,
+)
 
 
 def get_texture(file_name):
-    texture = vtk.vtkTexture()
+    texture = Texture()
     if not os.path.isfile(file_name):
         print('Nonexistent texture file:', file_name)
         return texture
     # Read the images
-    reader_factory = vtk.vtkImageReader2Factory()
+    reader_factory = ImageReader2Factory()
     img_reader = reader_factory.CreateImageReader2(file_name)
     img_reader.SetFileName(file_name)
 
@@ -57,7 +52,7 @@ def uvt_coords(u_res, v_res, pd):
     du = 1.0 / (u_res - 1)
     dv = 1.0 / (v_res - 1)
     num_pts = pd.GetNumberOfPoints()
-    t_coords = vtk.vtkFloatArray()
+    t_coords = FloatArray()
     t_coords.SetNumberOfComponents(2)
     t_coords.SetNumberOfTuples(num_pts)
     t_coords.SetName('Texture Coordinates')
@@ -76,13 +71,21 @@ def uvt_coords(u_res, v_res, pd):
 
 
 if __name__ == '__main__':
-    # NOTE: Need to be loaded in that order
-    cubemap_fns = [read_viz_textures('skybox-px.jpg'),
-                   read_viz_textures('skybox-nx.jpg'),
-                   read_viz_textures('skybox-py.jpg'),
-                   read_viz_textures('skybox-ny.jpg'),
-                   read_viz_textures('skybox-pz.jpg'),
-                   read_viz_textures('skybox-nz.jpg')]
+
+    fetch_viz_cubemaps()
+
+    texture_name = 'skybox'
+    #texture_name = 'brudslojan'
+    textures = read_viz_cubemap(texture_name)
+
+    cubemap = load_cubemap_texture(textures)
+
+    #cubemap.RepeatOff()
+    #cuebmap.EdgeClampOn()
+
+    scene = window.Scene(skybox=cubemap)
+    #scene.skybox(visible=False)
+    scene.skybox(gamma_correct=False)
 
     albedo_fn = read_viz_textures('alien_terrain_basecolor.png')
     material_fn = read_viz_textures('alien_terrain_material.png')
@@ -105,15 +108,6 @@ if __name__ == '__main__':
     #normal_fn = read_viz_textures('stylized_ground_normal.png')
     #height_fn = read_viz_textures('stylized_ground_height.png')
 
-    # Load the cube map
-    cubemap = get_cubemap(cubemap_fns)
-
-    # Load the skybox
-    skybox = get_cubemap(cubemap_fns)
-    skybox.InterpolateOn()
-    skybox.RepeatOff()
-    skybox.EdgeClampOn()
-
     # Get the textures
     material = get_texture(material_fn)
     albedo = get_texture(albedo_fn)
@@ -122,27 +116,26 @@ if __name__ == '__main__':
     emissive = get_texture(emissive_fn)
     emissive.UseSRGBColorSpaceOn()
 
-    scene = window.Scene()
-
-    reader = vtk.vtkPNGReader()
+    reader = PNGReader()
     reader.SetFileName(height_fn)
     reader.Update()
 
     image_extents = np.asarray(reader.GetDataExtent())
-    image_size = np.asarray([image_extents[1] - image_extents[0],
-                             image_extents[3] - image_extents[2],
-                             image_extents[5] - image_extents[4]])
+    image_size = np.asarray([
+        image_extents[1] - image_extents[0],
+        image_extents[3] - image_extents[2],
+        image_extents[5] - image_extents[4]])
 
     u_res = 1000
     v_res = 1000
-    surface = vtk.vtkParametricSuperEllipsoid()
+    surface = ParametricSuperEllipsoid()
     #surface.SetN1(.8)
     #surface.SetN2(.8)
     #surface.SetXRadius(.1)
     #surface.SetYRadius(.1)
     #surface.SetZRadius(.1)
 
-    source = vtk.vtkParametricFunctionSource()
+    source = ParametricFunctionSource()
     source.SetUResolution(u_res)
     source.SetVResolution(v_res)
     source.SetParametricFunction(surface)
@@ -153,7 +146,7 @@ if __name__ == '__main__':
 
     t_coords = pd.GetPointData().GetTCoords()
 
-    probe_points = vtk.vtkPoints()
+    probe_points = Points()
     probe_points.SetNumberOfPoints(t_coords.GetNumberOfValues())
 
     np_coords = numpy_support.vtk_to_numpy(t_coords)
@@ -162,10 +155,10 @@ if __name__ == '__main__':
     probe_points.SetData(
         numpy_support.numpy_to_vtk(np.hstack([np_coords, n_0]) * image_size))
 
-    probe_poly = vtk.vtkPolyData()
+    probe_poly = PolyData()
     probe_poly.SetPoints(probe_points)
 
-    probes = vtk.vtkProbeFilter()
+    probes = ProbeFilter()
     probes.SetSourceData(reader.GetOutput())
     probes.SetInputData(probe_poly)
     probes.Update()
@@ -176,7 +169,7 @@ if __name__ == '__main__':
     #height_scale = .00075  # Snitch
     height_scale = .00125  # Alien-Rock
     #height_scale = .0005  # Ground
-    warp = vtk.vtkWarpScalar()
+    warp = WarpScalar()
     #warp.SetInputData(tangents.GetOutput())
     warp.SetInputData(source.GetOutput())
     warp.SetScaleFactor(height_scale)
@@ -189,17 +182,17 @@ if __name__ == '__main__':
     #tangents.Update()
 
     # Build the pipeline
-    mapper = vtk.vtkPolyDataMapper()
+    mapper = PolyDataMapper()
     mapper.SetInputConnection(warp.GetOutputPort())
     #mapper.SetInputData(tangents.GetOutput())
     mapper.GetInput().GetPointData().SetScalars(None)
 
-    actor = vtk.vtkActor()
+    actor = Actor()
     actor.SetMapper(mapper)
 
     actor.GetProperty().SetInterpolationToPBR()
 
-    colors = vtk.vtkNamedColors()
+    colors = NamedColors()
 
     # Lets use a rough metallic surface
     metallic_coef = 1.
@@ -228,20 +221,6 @@ if __name__ == '__main__':
     actor.GetProperty().SetNormalTexture(normal)
     actor.GetProperty().SetNormalScale(normal_scale)
 
-    scene.UseImageBasedLightingOn()
-    """
-    if vtk.VTK_VERSION_NUMBER >= 90000000000:
-        scene.SetEnvironmentTexture(cubemap)
-    else:
-        scene.SetEnvironmentCubeMap(cubemap)
-    """
-    scene.background(colors.GetColor3d('White'))
-
     scene.add(actor)
-
-    # Comment out if you don't want a skybox
-    #skybox_actor = vtk.vtkSkybox()
-    #skybox_actor.SetTexture(skybox)
-    #scene.add(skybox_actor)
 
     window.show(scene)
