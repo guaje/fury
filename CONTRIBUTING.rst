@@ -38,6 +38,11 @@ Write Documentation
 FURY could always use more documentation, whether
 as part of the official FURY docs, in docstrings,
 or even on the web in blog posts, articles, and such.
+FURY uses `Sphinx <http://www.sphinx-doc.org/en/stable/index.html) to generate documentation>`_.
+Please follow the `numpy coding style <https://numpydoc.readthedocs.io/en/latest/format.html#docstring-standard>`_ and `PEP8 <https://www.python.org/dev/peps/pep-0008/>`_
+for docstring documentation.
+
+
 
 Submit Feedback
 ~~~~~~~~~~~~~~~
@@ -105,9 +110,9 @@ Before you submit a pull request, check that it meets these guidelines:
 1. The pull request should include tests.
 2. If the pull request adds functionality, the docs should be updated. Put
    your new functionality into a function with a docstring, and add the
-   feature to the list in README.rst.
-3. The pull request should work for Python 2.7, 3.4, 3.5, 3.6, 3.7 and for PyPy. Check
-   https://travis-ci.org/fury-gl/fury/pull_requests
+   feature to the list in README.md.
+3. The pull request should work for Python 3.6, 3.7, 3.8, 3.9 and for PyPy. Check
+   https://github.com/fury-gl/fury/actions
    and make sure that the tests pass for all supported Python versions.
 
 Publishing Releases
@@ -122,8 +127,7 @@ Checklist before Releasing
 
 * Check whether there are no build failing on `Travis`.
 
-* Review and update the release notes.  Review and update the :file:`Changelog`
-  file.  Get a partial list of contributors with something like::
+* Review and update the release notes. Get a partial list of contributors with something like::
 
       git shortlog -nse v0.1.0..
 
@@ -137,7 +141,7 @@ Checklist before Releasing
 
 * Add any new authors to the ``AUTHORS`` file.
 
-* Check the copyright years in ``docs/source/conf.py`` and ``LICENSE``
+* Check the copyright years in ``LICENSE``
 
 * Generate release notes. Go to ``docs/source/ext`` and run ``github_tools.py`` script the following way::
 
@@ -235,7 +239,7 @@ Doing the release
       git co main-master
 
 
-    Next merge the maintenace branch with the "ours" strategy.  This just labels
+    Next merge the maintenance branch with the "ours" strategy.  This just labels
     the maintenance branch `info.py` edits as seen but discarded, so we can
     merge from maintenance in future without getting spurious merge conflicts::
 

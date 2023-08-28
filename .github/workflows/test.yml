@@ -1,0 +1,126 @@
+# This workflow will install Python dependencies, run tests and lint with a variety of Python versions
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: FURY Tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  schedule:
+    - cron: '0 2 * * Mon'  # weekly
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [3.8, 3.9, '3.10', 3.11]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        platform: [x64]
+        install-type: [pip, ]  # conda]
+        depends: [DEFAULT_DEPS, OPTIONAL_DEPS]
+        coverage: [false]
+        use-pre: [false]
+        include:
+          - os: macos-latest # ubuntu-latest
+            python-version: '3.10'
+            install-type: pip
+            depends: OPTIONAL_DEPS
+            coverage: true
+            use-pre: false
+          - os: ubuntu-latest
+            python-version: '3.10'
+            install-type: pip
+            depends: OPTIONAL_DEPS
+            coverage: false
+            use-pre: true
+    env:
+      INSTALL_TYPE: ${{ matrix.install-type }}
+      DEPENDS: ${{ matrix.depends }}
+      PYTHON_VERSION: ${{ matrix.python-version }}
+      VENV_ARGS: "--python=python"
+      USE_PRE: ${{ matrix.use-pre }}
+      COVERAGE: ${{ matrix.coverage }}
+      PRE_WHEELS: "https://pypi.anaconda.org/scipy-wheels-nightly/simple"
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - uses: actions/cache@v2
+      if: startsWith(runner.os, 'Linux')
+      with:
+        path: |
+          ~/.cache/pip
+          ~/.ccache
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    - uses: actions/cache@v2
+      if: startsWith(runner.os, 'macOS')
+      with:
+        path: ~/Library/Caches/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    - uses: actions/cache@v2
+      if: startsWith(runner.os, 'Windows')
+      with:
+        path: ~/.pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Set up Virtualenv
+      if: ${{ matrix.install-type != 'conda' }}
+      run: |
+        python -m pip install --upgrade pip virtualenv
+        virtualenv $VENV_ARGS venv
+    - name: Setup Miniconda
+      uses: conda-incubator/setup-miniconda@v2
+      if: ${{ matrix.install-type == 'conda' }}
+      with:
+        auto-update-conda: true
+        auto-activate-base: false
+        activate-environment: venv
+        python-version: ${{ matrix.python-version }}
+        channels: defaults, conda-forge
+        use-only-tar-bz2: true
+    - name: Install Dependencies
+      run: ci/install_dependencies.sh
+    - name: Install FURY
+      run: ci/install.sh
+    - name: Setup Headless
+      run: ci/setup_headless.sh
+    - name: Run the tests!
+      run: |
+        if [ "${{ matrix.use-pre }}" == "true" ]; then
+          ci/run_tests.sh || echo "::warning::Experimental Job so failure ignored!"
+        else
+          ci/run_tests.sh
+        fi
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      if: ${{ matrix.coverage }}
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        directory: for_testing
+        files: coverage.xml
+        fail_ci_if_error: true
+        env_vars: ${{ matrix.os }}, PYTHON_VERSION
+        flags: unittests
+        name: codecov-umbrella
+        verbose: true
