@@ -1,3 +1,5 @@
+import vtkmodules.vtkCommonColor as common_color_vtk  # type: ignore
+import vtkmodules.vtkCommonComputationalGeometry as common_computational_geometry_vtk  # type: ignore
 import vtkmodules.vtkCommonCore as ccvtk  # type: ignore
 import vtkmodules.vtkCommonDataModel as cdmvtk  # type: ignore
 import vtkmodules.vtkCommonExecutionModel as cemvtk  # type: ignore
@@ -73,6 +75,16 @@ VTK_UNSIGNED_CHAR = ccvtk.VTK_UNSIGNED_CHAR
 VTK_UNSIGNED_INT = ccvtk.VTK_UNSIGNED_INT
 #: class for VTK_UNSIGNED_SHORT
 VTK_UNSIGNED_SHORT = ccvtk.VTK_UNSIGNED_SHORT
+
+##############################################################
+#  vtkCommonColor Module
+#: class for NamedColors
+NamedColors = common_color_vtk.vtkNamedColors
+
+##############################################################
+#  vtkCommonComputationalGeometry Module
+#: class for ParametricSuperEllipsoid
+ParametricSuperEllipsoid = common_computational_geometry_vtk.vtkParametricSuperEllipsoid
 
 ##############################################################
 #  vtkCommonExecutionModel Module
@@ -183,6 +195,8 @@ TubeFilter = fcvtk.vtkTubeFilter
 Glyph3D = fcvtk.vtkGlyph3D
 #: class for TriangleFilter
 TriangleFilter = fcvtk.vtkTriangleFilter
+#: class for ProbeFilter
+ProbeFilter = fcvtk.vtkProbeFilter
 
 ##############################################################
 #  vtkFiltersGeneral Module
@@ -190,6 +204,8 @@ TriangleFilter = fcvtk.vtkTriangleFilter
 SplineFilter = fgvtk.vtkSplineFilter
 #: class for TransformPolyDataFilter
 TransformPolyDataFilter = fgvtk.vtkTransformPolyDataFilter
+#: class for WarpScalar
+WarpScalar = fgvtk.vtkWarpScalar
 
 ##############################################################
 #  vtkFiltersHybrid Module
@@ -228,6 +244,8 @@ DiskSource = fsvtk.vtkDiskSource
 TexturedSphereSource = fsvtk.vtkTexturedSphereSource
 #: class for RegularPolygonSource
 RegularPolygonSource = fsvtk.vtkRegularPolygonSource
+#: class for ParametricFunctionSource
+ParametricFunctionSource = fsvtk.vtkParametricFunctionSource
 
 ##############################################################
 #  vtkCommonDataModel Module
