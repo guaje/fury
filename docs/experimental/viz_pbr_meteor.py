@@ -2,7 +2,7 @@ import os
 
 import numpy as np
 
-from fury import actor, window
+from fury import window
 from fury.data import fetch_viz_cubemaps, read_viz_cubemap, read_viz_textures
 from fury.io import load_cubemap_texture
 from fury.lib import (
