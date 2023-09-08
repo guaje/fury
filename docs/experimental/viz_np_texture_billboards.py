@@ -10,14 +10,20 @@ if __name__ == '__main__':
     scene = window.Scene()
     scene.background((1, 1, 1))
 
-    centers = np.array([[0, 0, 0]])
+    centers = np.array([[0, 0, 0], [-2.5, -2, 0], [-1, -2, 0], [1, -2, 0],
+                        [2.5, -2, 0]])
+    scales = [1, .5, .5, .5, .5]
 
-    texture_actor = actor.billboard(centers, colors=(1, 1, 1))
+    texture_actor = actor.billboard(centers, colors=(1, 1, 1), scales=scales)
 
     actor_pd = texture_actor.GetMapper().GetInput()
 
     # TODO: Study and understand UV texture coordinates
-    uv_vals = np.array([[0, 0], [0, 1], [1, 1], [1, 0]])
+    uv_vals = np.array([[0, 0], [0, 1], [1, 1], [1, 0],
+                        [0, .5], [0, 1], [.5, 1], [.5, .5],
+                        [.5, .5], [.5, 1], [1, 1], [1, .5],
+                        [0, 0], [0, .5], [.5, .5], [.5, 0],
+                        [.5, 0], [.5, .5], [1, .5], [1, 0]])
 
     num_pnts = uv_vals.shape[0]
 
@@ -30,7 +36,7 @@ if __name__ == '__main__':
     set_polydata_tcoords(actor_pd, t_coords)
 
     np.random.seed(8)
-    #arr = np.random.randn(2, 2, 3)
+    #arr = np.random.randn(2, 2, 3) * 255
     arr = np.array([[[255, 0, 0], [255, 255, 0]], [[0, 255, 0], [0, 0, 255]]])
     grid = rgb_to_vtk(arr.astype(np.uint8))
 
