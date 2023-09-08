@@ -1,5 +1,3 @@
-import os
-
 import numpy as np
 
 from fury import actor, window
