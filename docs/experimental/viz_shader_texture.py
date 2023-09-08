@@ -1,8 +1,17 @@
 import numpy as np
-import vtk
 from viz_shader_canvas import cube
 
 from fury import window
+from fury.lib import (
+    Actor,
+    ImageFlip,
+    JPEGReader,
+    OpenGLPolyDataMapper,
+    PolyDataNormals,
+    SphereSource,
+    Texture,
+)
+from fury.shaders import replace_shader_in_actor, shader_to_actor
 from fury.utils import rgb_to_vtk
 
 scene = window.Scene()
@@ -14,30 +23,30 @@ if selected_actor == 'cube':
 
 if selected_actor == 'sphere':
     # Generate an sphere polydata
-    sphere = vtk.vtkSphereSource()
+    sphere = SphereSource()
     sphere.SetThetaResolution(300)
     sphere.SetPhiResolution(300)
 
-    norms = vtk.vtkPolyDataNormals()
+    norms = PolyDataNormals()
     norms.SetInputConnection(sphere.GetOutputPort())
 
-    mapper = vtk.vtkOpenGLPolyDataMapper()
+    mapper = OpenGLPolyDataMapper()
     mapper.SetInputConnection(norms.GetOutputPort())
 
-    canvas_actor = vtk.vtkActor()
+    canvas_actor = Actor()
     canvas_actor.SetMapper(mapper)
 
-texture = vtk.vtkTexture()
+texture = Texture()
 texture.CubeMapOn()
 
 selected_texture = 'numpy'
 
 if selected_texture == 'file':
     file = 'sugar.jpg'
-    imgReader = vtk.vtkJPEGReader()
+    imgReader = JPEGReader()
     imgReader.SetFileName(file)
     for i in range(6):
-        flip = vtk.vtkImageFlip()
+        flip = ImageFlip()
         flip.SetInputConnection(imgReader.GetOutputPort())
         flip.SetFilteredAxis(1)
         texture.SetInputConnection(i, flip.GetOutputPort())
@@ -50,49 +59,31 @@ if selected_texture == 'numpy':
         texture.SetInputDataObject(i, grid)
 
 canvas_actor.SetTexture(texture)
-mapper = canvas_actor.GetMapper()
 
-# // Add new code in default VTK vertex shader
-mapper.AddShaderReplacement(
-    vtk.vtkShader.Vertex,
-    '//VTK::PositionVC::Dec',  # replace the normal block
-    True,  # before the standard replacements
-    """
-    //VTK::PositionVC::Dec  // we still want the default
-    out vec3 TexCoords;
-    """,
-    False,  # only do it once
-)
+vs_dec = 'out vec3 TexCoords;'
+vs_impl = \
+"""
+vec3 camPos = -MCVCMatrix[3].xyz * mat3(MCVCMatrix);
+TexCoords = reflect(vertexMC.xyz - camPos, normalize(normalMC));
+//TexCoords = normalMC;
+//TexCoords = vertexMC.xyz;
+"""
+shader_to_actor(canvas_actor, 'vertex', decl_code=vs_dec, impl_code=vs_impl)
 
-mapper.AddShaderReplacement(
-    vtk.vtkShader.Vertex,
-    '//VTK::PositionVC::Impl',  # replace the normal block
-    True,  # before the standard replacements
-    """
-    //VTK::PositionVC::Impl  // we still want the default
-    vec3 camPos = -MCVCMatrix[3].xyz * mat3(MCVCMatrix);
-    TexCoords.xyz = reflect(vertexMC.xyz - camPos, normalize(normalMC));
-    //TexCoords.xyz = normalMC;
-    //TexCoords.xyz = vertexMC.xyz;
-    """,
-    False,  # only do it once
-)
+fs_code = \
+"""
+//VTK::System::Dec  // Always start with this line
+//VTK::Output::Dec  // Always have this line in your shader
+in vec3 TexCoords;
+uniform samplerCube texture_0;
 
-mapper.SetFragmentShaderCode(
-    """
-    //VTK::System::Dec  // always start with this line
-    //VTK::Output::Dec  // always have this line in your FS
-    in vec3 TexCoords;
-    uniform samplerCube texture_0;
-
-    void main() {
-        gl_FragData[0] = texture(texture_0, TexCoords);
-    }
-    """
-)
+void main()
+{
+    gl_FragData[0] = texture(texture_0, TexCoords);
+}
+"""
+replace_shader_in_actor(canvas_actor, 'fragment', fs_code)
 
 scene.add(canvas_actor)
-# scene.add(actor.axes())
-# scene.add(texture(np.random.randn(512, 512, 3)))
 
 window.show(scene)

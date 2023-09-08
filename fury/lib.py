@@ -169,6 +169,8 @@ ScalarBarActor = ravtk.vtkScalarBarActor
 OpenGLRenderer = roglvtk.vtkOpenGLRenderer
 #: class for Shader
 Shader = roglvtk.vtkShader
+#: class for OPenGLPolyDataMapper
+OpenGLPolyDataMapper = roglvtk.vtkOpenGLPolyDataMapper
 
 ##############################################################
 #  vtkInteractionStyle Module
