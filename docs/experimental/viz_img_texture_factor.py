@@ -35,11 +35,11 @@ if __name__ == '__main__':
     scene = window.Scene()
     scene.background((1, 1, 1))
 
-    centers = np.array([[0, 0, 0]])
+    center = np.array([[0, 0, 0]])
 
     vertices, faces = prim_sphere(name='repulsion100')
     texture_actor = actor.sphere(
-        centers, (1, 1, 1), vertices=vertices, faces=faces, use_primitive=True)
+        center, (1, 1, 1), vertices=vertices, faces=faces, use_primitive=True)
 
     actor_pd = texture_actor.GetMapper().GetInput()
 
