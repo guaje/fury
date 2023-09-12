@@ -14,7 +14,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from fury.data import read_dataset
-from fury.nn.utils import get_minibatches, positional_encoding, run_one_iter_of_tinynerf
+from fury.nn.utils import (
+    get_minibatches,
+    positional_encoding,
+    run_one_iter_of_tinynerf,
+)
 from fury.optpkg import optional_package
 
 torch, has_torch, _ = optional_package("torch")
@@ -33,7 +37,9 @@ class VeryTinyNerfModel(nn.Module):
     def __init__(self, filter_size=128, num_encoding_functions=6):
         super(VeryTinyNerfModel, self).__init__()
         # Input layer (default: 39 -> 128)
-        self.layer1 = nn.Linear(3 + 3 * 2 * num_encoding_functions, filter_size)
+        self.layer1 = nn.Linear(
+            3 + 3 * 2 * num_encoding_functions, filter_size
+        )
         # Layer 2 (default: 128 -> 128)
         self.layer2 = nn.Linear(filter_size, filter_size)
         # Layer 3 (default: 128 -> 4)
@@ -143,9 +149,17 @@ if __name__ == "__main__":
 
         # Run one iteration of TinyNeRF and get the rendered RGB image.
         rgb_predicted = run_one_iter_of_tinynerf(
-            height, width, focal_length, target_tform_cam2world, near_thresh,
-            far_thresh, depth_samples_per_ray, model, encode, get_minibatches,
-            chunksize=chunksize
+            height,
+            width,
+            focal_length,
+            target_tform_cam2world,
+            near_thresh,
+            far_thresh,
+            depth_samples_per_ray,
+            model,
+            encode,
+            get_minibatches,
+            chunksize=chunksize,
         )
 
         # Compute mean-squared error between the predicted and target images.
@@ -159,9 +173,18 @@ if __name__ == "__main__":
         if i % display_every == 0:
             # Render the held-out view
             rgb_predicted = run_one_iter_of_tinynerf(
-                height, width, focal_length, testpose, near_thresh, far_thresh,
-                depth_samples_per_ray, model, encode, get_minibatches,
-                chunksize=chunksize)
+                height,
+                width,
+                focal_length,
+                testpose,
+                near_thresh,
+                far_thresh,
+                depth_samples_per_ray,
+                model,
+                encode,
+                get_minibatches,
+                chunksize=chunksize,
+            )
             loss = torch.nn.functional.mse_loss(rgb_predicted, target_img)
             print("Loss:", loss.item())
             psnr = -10.0 * torch.log10(loss)

@@ -126,7 +126,12 @@ parts of the ray's trajectory are spanned.
 
 
 def compute_query_points_from_rays(
-    ray_origins, ray_directions, near_thresh, far_thresh, num_samples, randomize=True
+    ray_origins,
+    ray_directions,
+    near_thresh,
+    far_thresh,
+    num_samples,
+    randomize=True,
 ):
     """
     Compute query 3D points given the "bundle" of rays. The near_thresh and far
@@ -160,7 +165,9 @@ def compute_query_points_from_rays(
     """
     # TESTED
     # shape: (num_samples)
-    depth_values = torch.linspace(near_thresh, far_thresh, num_samples).to(ray_origins)
+    depth_values = torch.linspace(near_thresh, far_thresh, num_samples).to(
+        ray_origins
+    )
     if randomize is True:
         # ray_origins: (width, height, 3)
         # noise_shape = (width, height, num_samples)
@@ -220,7 +227,9 @@ def render_volume_density(radiance_field, ray_origins, depth_values):
     # TESTED
     sigma_a = nn.functional.relu(radiance_field[..., 3])
     rgb = torch.sigmoid(radiance_field[..., :3])
-    one_e_10 = torch.tensor([1e10], dtype=ray_origins.dtype, device=ray_origins.device)
+    one_e_10 = torch.tensor(
+        [1e10], dtype=ray_origins.dtype, device=ray_origins.device
+    )
     dists = torch.cat(
         (
             depth_values[..., 1:] - depth_values[..., :-1],
@@ -307,15 +316,26 @@ def get_minibatches(inputs, chunksize=1024 * 8):
     minibatches. Each element of the list (except possibly the last) has
     dimension `0` of length `chunksize`.
     """
-    return [inputs[i: i + chunksize] for i in range(0, inputs.shape[0], chunksize)]
+    return [
+        inputs[i : i + chunksize] for i in range(0, inputs.shape[0], chunksize)
+    ]
 
 
 # Train TinyNeRF! (The cool part!)
 # One iteration of TinyNeRF (forward pass).
 def run_one_iter_of_tinynerf(
-    height, width, focal_length, tform_cam2world, near_thresh, far_thresh,
-    depth_samples_per_ray, model, encoding_function, get_minibatches_function,
-    chunksize=1024 * 8):
+    height,
+    width,
+    focal_length,
+    tform_cam2world,
+    near_thresh,
+    far_thresh,
+    depth_samples_per_ray,
+    model,
+    encoding_function,
+    get_minibatches_function,
+    chunksize=1024 * 8,
+):
     # Get the "bundle" of rays through all image pixels.
     ray_origins, ray_directions = get_ray_bundle(
         height, width, focal_length, tform_cam2world
@@ -323,7 +343,11 @@ def run_one_iter_of_tinynerf(
 
     # Sample query points along each ray
     query_points, depth_values = compute_query_points_from_rays(
-        ray_origins, ray_directions, near_thresh, far_thresh, depth_samples_per_ray
+        ray_origins,
+        ray_directions,
+        near_thresh,
+        far_thresh,
+        depth_samples_per_ray,
     )
 
     # "Flatten" the query points.
