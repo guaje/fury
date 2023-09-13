@@ -42,7 +42,10 @@ if __name__ == "__main__":
 
     np.random.seed(8)
     # arr = np.random.randn(2, 2, 3) * 255
-    arr = np.array([[[255, 0, 0], [255, 255, 0]], [[0, 255, 0], [0, 0, 255]]])
+    # arr = np.random.randn(2, 2) * 255
+    # arr = np.array([[[255, 0, 0], [255, 255, 0]], [[0, 255, 0], [0, 0, 255]]])
+    arr = np.array([[[0], [83]], [[167], [250]]])
+
     grid = rgb_to_vtk(arr.astype(np.uint8))
 
     texture = Texture()
