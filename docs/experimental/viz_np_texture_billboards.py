@@ -53,7 +53,8 @@ if __name__ == "__main__":
     texture.Update()
 
     # NOTE: Configure textures (needs TCoords on the mesh)
-    texture_actor.GetProperty().SetTexture("texture0", texture)
+    # texture_actor.GetProperty().SetTexture("texture0", texture)
+    texture_actor.SetTexture(texture)
 
     scene.add(texture_actor)
 
