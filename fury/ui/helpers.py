@@ -51,7 +51,6 @@ def wrap_overflow(textblock, wrap_width, side='right'):
     """
     original_str = textblock.message
     str_copy = textblock.message
-    prev_bg = textblock.have_bg
     wrap_idxs = []
 
     wrap_idx = check_overflow(textblock, wrap_width, '', side)
@@ -66,18 +65,16 @@ def wrap_overflow(textblock, wrap_width, side='right'):
         textblock.message = str_copy
         wrap_idx = check_overflow(textblock, wrap_width, '', side)
         if wrap_idx != 0:
-            wrap_idxs.append(wrap_idxs[-1]+wrap_idx+1)
+            wrap_idxs.append(wrap_idxs[-1] + wrap_idx + 1)
 
     for idx in wrap_idxs:
         original_str = original_str[:idx] + '\n' + original_str[idx:]
 
     textblock.message = original_str
-    textblock.have_bg = prev_bg
     return textblock.message
 
 
-def check_overflow(textblock, width, overflow_postfix='',
-                   side='right'):
+def check_overflow(textblock, width, overflow_postfix='', side='right'):
     """Checks if the text is overflowing.
     Parameters
     ----------
@@ -100,26 +97,83 @@ def check_overflow(textblock, width, overflow_postfix='',
     start_ptr = 0
     mid_ptr = 0
     end_ptr = len(original_str)
-    prev_bg = textblock.have_bg
-    textblock.have_bg = False
 
     if side == 'left':
         original_str = original_str[::-1]
 
-    if textblock.size[0] <= width:
-        textblock.have_bg = prev_bg
+    if textblock.cal_size_from_message()[0] <= width:
         return 0
 
     while start_ptr < end_ptr:
-        mid_ptr = (start_ptr + end_ptr)//2
+        mid_ptr = (start_ptr + end_ptr) // 2
         textblock.message = original_str[:mid_ptr] + overflow_postfix
 
-        if textblock.size[0] < width:
+        if textblock.cal_size_from_message()[0] < width:
             start_ptr = mid_ptr
-        elif textblock.size[0] > width:
+        elif textblock.cal_size_from_message()[0] > width:
             end_ptr = mid_ptr
 
-        if mid_ptr == (start_ptr + end_ptr) // 2 or textblock.size[0] == width:
+        if mid_ptr == (start_ptr + end_ptr) // 2 or textblock.cal_size_from_message()[0] == width:
             if side == 'left':
                 textblock.message = textblock.message[::-1]
             return mid_ptr
+
+
+def cal_bounding_box_2d(vertices):
+    """Calculate the min, max position and the size of the bounding box.
+
+    Parameters
+    ----------
+    vertices : ndarray
+        vertices of the actors.
+    """
+
+    if vertices.ndim != 2 or vertices.shape[1] not in [2, 3]:
+        raise IOError('vertices should be a 2D array with shape (n,2) or (n,3).')
+
+    if vertices.shape[1] == 3:
+        vertices = vertices[:, :-1]
+
+    min_x, min_y = vertices[0]
+    max_x, max_y = vertices[0]
+
+    for x, y in vertices:
+        if x < min_x:
+            min_x = x
+        if y < min_y:
+            min_y = y
+        if x > max_x:
+            max_x = x
+        if y > max_y:
+            max_y = y
+
+    bounding_box_min = np.asarray([min_x, min_y], dtype='int')
+    bounding_box_max = np.asarray([max_x, max_y], dtype='int')
+    bounding_box_size = np.asarray([max_x - min_x, max_y - min_y], dtype='int')
+
+    return bounding_box_min, bounding_box_max, bounding_box_size
+
+
+def rotate_2d(vertices, angle):
+    """Rotate the given vertices by an angle.
+
+    Parameters
+    ----------
+    vertices : ndarray
+        vertices of the actors.
+    angle: float
+        Value by which the vertices are rotated in radian.
+    """
+    if vertices.ndim != 2 or vertices.shape[1] != 3:
+        raise IOError('vertices should be a 2D array with shape (n,3).')
+
+    rotation_matrix = np.array(
+        [
+            [np.cos(angle), np.sin(angle), 0],
+            [-np.sin(angle), np.cos(angle), 0],
+            [0, 0, 1],
+        ]
+    )
+    new_vertices = np.matmul(vertices, rotation_matrix)
+
+    return new_vertices
