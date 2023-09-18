@@ -1,8 +1,23 @@
 import numpy as np
 
 from fury import actor, window
-from fury.lib import FloatArray, Texture
+from fury.lib import FloatArray, ImageData, Texture, numpy_support
 from fury.utils import rgb_to_vtk, set_polydata_tcoords
+
+
+def np_array_to_vtk_img(data):
+    grid = ImageData()
+    grid.SetDimensions(data.shape[1], data.shape[0], 1)
+    nd = data.shape[-1] if data.ndim == 3 else 1
+    vtkarr = numpy_support.numpy_to_vtk(
+        np.flip(data.swapaxes(0, 1), axis=1).reshape((-1, nd), order="F")
+    )
+    vtkarr.SetName("Image")
+    grid.GetPointData().AddArray(vtkarr)
+    grid.GetPointData().SetActiveScalars("Image")
+    grid.GetPointData().Update()
+    return grid
+
 
 if __name__ == "__main__":
     scene = window.Scene()
@@ -17,7 +32,6 @@ if __name__ == "__main__":
 
     actor_pd = texture_actor.GetMapper().GetInput()
 
-    # TODO: Study and understand UV texture coordinates
     # fmt: off
     uv_vals = np.array(
         [
@@ -44,9 +58,9 @@ if __name__ == "__main__":
     # arr = np.random.randn(2, 2, 3) * 255
     # arr = np.random.randn(2, 2) * 255
     # arr = np.array([[[255, 0, 0], [255, 255, 0]], [[0, 255, 0], [0, 0, 255]]])
-    arr = np.array([[[0], [83]], [[167], [250]]])
+    arr = np.array([[0, 83], [167, 250]])
 
-    grid = rgb_to_vtk(arr.astype(np.uint8))
+    grid = np_array_to_vtk_img(arr.astype(np.uint8))
 
     texture = Texture()
     texture.SetInputDataObject(grid)
