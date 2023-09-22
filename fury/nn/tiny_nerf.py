@@ -10,16 +10,26 @@ Authors' TensorFlow implementation: https://github.com/bmild/nerf
 
 # NOTE: All functions that have a `#TESTED` under the docstring imply that they
 # have been tested against their corresponding tensorflow implementations.
+from math import pi
+
 import matplotlib.pyplot as plt
 import numpy as np
 
+from fury import actor, window
 from fury.data import read_dataset
+from fury.lib import FloatArray, Texture
 from fury.nn.utils import (
     get_minibatches,
     positional_encoding,
     run_one_iter_of_tinynerf,
 )
 from fury.optpkg import optional_package
+from fury.utils import (
+    apply_affine,
+    rgb_to_vtk,
+    set_polydata_tcoords,
+    update_surface_actor_colors,
+)
 
 torch, has_torch, _ = optional_package("torch")
 
@@ -54,9 +64,75 @@ class VeryTinyNerfModel(nn.Module):
         return x
 
 
-if __name__ == "__main__":
-    # Get data
+def billboard_texture_actor(center, scale):
+    texture_actor = actor.billboard(center, colors=(1, 1, 1), scales=scale)
+    actor_pd = texture_actor.GetMapper().GetInput()
+    uv_vals = np.array([[0, 0], [0, 1], [1, 1], [1, 0]])
+    tex_coords = FloatArray()
+    tex_coords.SetNumberOfComponents(2)
+    tex_coords.SetNumberOfTuples(4)
+    [tex_coords.SetTuple(i, uv_vals[i]) for i in range(4)]
+    set_polydata_tcoords(actor_pd, tex_coords)
+    return texture_actor
 
+
+def left_click_pose_callback(obj, event):
+    global data_dict, images, img_actor, picked_pose, picked_pose_actor
+    clicked_pose_actor = obj
+    update_surface_actor_colors(clicked_pose_actor, np.array([[0, 1, 0]]))
+    update_surface_actor_colors(picked_pose_actor, np.array([[1, 1, 1]]))
+    picked_pose = data_dict[clicked_pose_actor]["idx"]
+    picked_pose_actor = clicked_pose_actor
+    img_arr = images[picked_pose] * 255
+    texture_to_billboard(img_actor, img_arr.astype(np.uint8))
+
+
+def pose_explorator(scene, pose_affines):
+    global data_dict, img_actor, picked_pose, picked_pose_actor
+    data_dict = {}
+    centers = np.zeros((pose_affines.shape[0], 3))
+    picked_pose = 0
+    picked_pose_actor = None
+    for i in range(pose_affines.shape[0]):
+        centers[i] = apply_affine(pose_affines[i], centers[i])
+        center = np.array([centers[i]])
+        color = (0, 1, 0) if i == picked_pose else (1, 1, 1)
+        pose_actor = actor.dot(center, color)
+        pose_actor.AddObserver(
+            "LeftButtonPressEvent", left_click_pose_callback, 1
+        )
+        if i == picked_pose:
+            picked_pose_actor = pose_actor
+        scene.add(pose_actor)
+        data_dict[pose_actor] = {"idx": i}
+    centers_mins = np.min(centers, axis=0)
+    centers_maxs = np.max(centers, axis=0)
+    centers_avgs = np.mean(np.vstack((centers_mins, centers_maxs)), axis=0)
+    img_arr = images[picked_pose] * 255
+    scale = 5
+    bb_center = np.array([[centers_avgs[0], centers_maxs[1] + scale + 1, 0]])
+    img_actor = billboard_texture_actor(bb_center, scale)
+    texture_to_billboard(img_actor, img_arr.astype(np.uint8))
+    scene.add(img_actor)
+
+
+def texture_to_billboard(billboard_actor, img):
+    grid = rgb_to_vtk(img)
+    texture = Texture()
+    texture.SetInputDataObject(grid)
+    texture.Update()
+    # billboard_actor.SetTexture(texture)
+    billboard_actor.GetProperty().SetTexture("texture0", texture)
+
+
+if __name__ == "__main__":
+    global images
+
+    scene = window.Scene()
+
+    show_m = window.ShowManager(scene, size=(1280, 720))
+
+    # Get data
     data_fname = read_dataset("tiny_nerf_data.npz")
 
     # Determine device to run on (GPU vs CPU)
@@ -70,12 +146,18 @@ if __name__ == "__main__":
     images = data["images"]
 
     # Camera extrinsics (poses)
-    tform_cam2world = data["poses"]
-    tform_cam2world = torch.from_numpy(tform_cam2world).to(device)
+    poses = data["poses"]
+
+    # pose_explorator(scene, poses)
+    # window.show(scene)
+    # show_m.initialize()
+    # show_m.start()
+
+    tform_cam2world = torch.from_numpy(poses).to(device)
 
     # Focal length (intrinsics)
     focal_length = data["focal"]
-    focal_length = torch.from_numpy(focal_length).to(device)
+    tform_focal_length = torch.from_numpy(focal_length).to(device)
 
     # Height and width of each image
     height, width = images.shape[1:3]
@@ -151,7 +233,7 @@ if __name__ == "__main__":
         rgb_predicted = run_one_iter_of_tinynerf(
             height,
             width,
-            focal_length,
+            tform_focal_length,
             target_tform_cam2world,
             near_thresh,
             far_thresh,
@@ -175,7 +257,7 @@ if __name__ == "__main__":
             rgb_predicted = run_one_iter_of_tinynerf(
                 height,
                 width,
-                focal_length,
+                tform_focal_length,
                 testpose,
                 near_thresh,
                 far_thresh,
