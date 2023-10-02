@@ -16,20 +16,24 @@ __all__ = [
     'DrawShape',
     'DrawPanel',
     'PlaybackPanel',
+    'Card2D',
+    'SpinBox'
 ]
 
 import os
 from collections import OrderedDict
 from numbers import Number
 from string import printable
+from PIL import UnidentifiedImageError, Image
+from urllib.request import urlopen
 
 import numpy as np
 
 from fury.data import read_viz_icons
 from fury.lib import Command
-from fury.ui.containers import Panel2D
+from fury.ui.containers import Panel2D, ImageContainer2D
 from fury.ui.core import UI, Button2D, Disk2D, Rectangle2D, TextBlock2D
-from fury.ui.helpers import TWO_PI, cal_bounding_box_2d, clip_overflow, rotate_2d
+from fury.ui.helpers import TWO_PI, cal_bounding_box_2d, clip_overflow, rotate_2d, wrap_overflow
 from fury.utils import set_polydata_vertices, update_actor, vertices_from_actor
 
 
@@ -131,7 +135,7 @@ class TextBox2D(UI):
 
         Create the TextBlock2D component used for the textbox.
         """
-        self.text = TextBlock2D()
+        self.text = TextBlock2D(dynamic_bbox=True)
 
         # Add default events listener for this UI component.
         self.text.on_left_mouse_button_pressed = self.left_button_press
@@ -1445,7 +1449,8 @@ class RingSlider2D(UI):
         self.handle.color = self.default_color
 
         # Slider Text
-        self.text = TextBlock2D(justification='center', vertical_justification='middle')
+        self.text = TextBlock2D(justification='center',
+                                vertical_justification='middle')
 
         # Add default events listener for this UI component.
         self.track.on_left_mouse_button_pressed = self.track_click_callback
@@ -2361,6 +2366,11 @@ class ComboBox2D(UI):
     @property
     def selected_text_index(self):
         return self._selection_ID
+
+    def set_visibility(self, visibility):
+        super().set_visibility(visibility)
+        if not self._menu_visibility:
+            self.drop_down_menu.set_visibility(False)
 
     def append_item(self, *items):
         """Append additional options to the menu.
@@ -4098,3 +4108,456 @@ class PlaybackPanel(UI):
 
     def _get_size(self):
         return self.panel.size + self._progress_bar.size + self.time_text.size
+
+
+class Card2D(UI):
+    """Card element to show image and related text
+
+    Attributes
+    ----------
+    image: :class: 'ImageContainer2D'
+        Renders the image on the card.
+    title_box: :class: 'TextBlock2D'
+        Displays the title on card.
+    body_box: :class: 'TextBLock2D'
+        Displays the body text.
+    """
+
+    def __init__(self, image_path, body_text="", draggable=True,
+                 title_text="", padding=10, position=(0, 0),
+                 size=(400, 400), image_scale=0.5, bg_color=(0.5, 0.5, 0.5),
+                 bg_opacity=1, title_color=(0., 0., 0.),
+                 body_color=(0., 0., 0.), border_color=(1., 1., 1.),
+                 border_width=0, maintain_aspect=False):
+        """
+
+        Parameters
+        ----------
+        image_path: str
+            Path of the image, supports png and jpg/jpeg images
+        body_text: str, optional
+            Card body text
+        draggable: Bool, optional
+            If the card should be draggable
+        title_text: str, optional
+            Card title text
+        padding: int, optional
+            Padding between image, title, body
+        position : (float, float), optional
+            Absolute coordinates (x, y) of the lower-left corner of the
+            UI component
+        size : (int, int), optional
+            Width and height of the pixels of this UI component.
+        image_scale: float, optional
+            fraction of size taken by the image (between 0 , 1)
+        bg_color: (float, float, float), optional
+            Background color of card
+        bg_opacity: float, optional
+            Background opacity
+        title_color: (float, float, float), optional
+            Title text color
+        body_color: (float, float, float), optional
+            Body text color
+        border_color: (float, float, float), optional
+            Border color
+        border_width: int, optional
+            Width of the border
+        maintain_aspect: bool, optional
+            If the image should be scaled to maintain aspect ratio
+        """
+
+        self.image_path = image_path
+        self._basename = os.path.basename(self.image_path)
+        self._extension = self._basename.split('.')[-1]
+        if self._extension not in ['jpg', 'jpeg', 'png']:
+            raise UnidentifiedImageError(
+                f'Image extension {self._extension} not supported')
+
+        self.body_text = body_text
+        self.title_text = title_text
+        self.draggable = draggable
+        self.card_size = size
+        self.padding = padding
+
+        self.title_color = [np.clip(value, 0, 1) for value in title_color]
+        self.body_color = [np.clip(value, 0, 1) for value in body_color]
+        self.bg_color = [np.clip(value, 0, 1) for value in bg_color]
+        self.border_color = [np.clip(value, 0, 1) for value in border_color]
+        self.bg_opacity = bg_opacity
+
+        self.text_scale = np.clip(1 - image_scale, 0, 1)
+        self.image_scale = np.clip(image_scale, 0, 1)
+
+        self.maintain_aspect = maintain_aspect
+        if self.maintain_aspect:
+            self._true_image_size = Image.open(urlopen(self.image_path)).size
+
+        self._image_size = (self.card_size[0], self.card_size[1] *
+                            self.image_scale)
+
+        self.border_width = border_width
+        self.has_border = bool(border_width)
+
+        super(Card2D, self).__init__()
+        self.position = position
+
+        if self.maintain_aspect:
+            self._new_size = (self._true_image_size[0],
+                              self._true_image_size[1] // self.image_scale)
+            self.resize(self._new_size)
+        else:
+            self.resize(size)
+
+    def _setup(self):
+        """ Setup this UI component
+        Create the image.
+        Create the title and body.
+        Create a Panel2D widget to hold image, title, body.
+        """
+        self.image = ImageContainer2D(img_path=self.image_path,
+                                      size=self._image_size)
+
+        self.body_box = TextBlock2D(text=self.body_text,
+                                    color=self.body_color)
+
+        self.title_box = TextBlock2D(text=self.title_text, bold=True,
+                                     color=self.title_color)
+
+        self.panel = Panel2D(self.card_size, color=self.bg_color,
+                             opacity=self.bg_opacity,
+                             border_color=self.border_color,
+                             border_width=self.border_width,
+                             has_border=self.has_border)
+
+        self.panel.add_element(self.image, (0., 0.))
+        self.panel.add_element(self.title_box, (0., 0.))
+        self.panel.add_element(self.body_box, (0., 0.))
+
+        if self.draggable:
+            self.panel.background.on_left_mouse_button_dragged =\
+                self.left_button_dragged
+            self.panel.background.on_left_mouse_button_pressed\
+                = self.left_button_pressed
+            self.image.on_left_mouse_button_dragged =\
+                self.left_button_dragged
+            self.image.on_left_mouse_button_pressed =\
+                self.left_button_pressed
+        else:
+            self.panel.background.on_left_mouse_button_dragged =\
+                lambda i_ren, _obj, _comp: i_ren.force_render
+
+    def _get_actors(self):
+        """ Get the actors composing this UI component.
+        """
+
+        return self.panel.actors
+
+    def _add_to_scene(self, _scene):
+        """ Add all subcomponents or VTK props that compose this UI component.
+
+        Parameters
+        ----------
+        scene : scene
+        """
+        self.panel.add_to_scene(_scene)
+        if self.size[0] <= 200:
+            clip_overflow(self.body_box, self.size[0]-2*self.padding)
+        else:
+            wrap_overflow(self.body_box, self.size[0]-2*self.padding)
+
+        wrap_overflow(self.title_box, self.size[0]-2*self.padding)
+
+    def _get_size(self):
+        return self.panel.size
+
+    def resize(self, size):
+        """Resize Card2D.
+
+        Parameters
+        ----------
+        size : (int, int)
+            Card2D size(width, height) in pixels.
+        """
+        _width, _height = size
+        self.panel.resize(size)
+
+        self._image_size = (size[0]-int(self.border_width),
+                            int(self.image_scale*size[1]))
+
+        _title_box_size = (_width - 2 * self.padding, _height *
+                           0.34 * self.text_scale / 2)
+
+        _body_box_size = (_width - 2 * self.padding, _height *
+                          self.text_scale / 2)
+
+        _img_coords = (int(self.border_width),
+                       int(size[1] - self._image_size[1]))
+
+        _title_coords = (self.padding, int(_img_coords[1] -
+                                           _title_box_size[1] - self.padding +
+                                           self.border_width))
+
+        _text_coords = (self.padding, int(_title_coords[1] -
+                                          _body_box_size[1] - self.padding +
+                                          self.border_width))
+
+        self.panel.update_element(self.image, _img_coords)
+        self.panel.update_element(self.body_box, _text_coords)
+        self.panel.update_element(self.title_box, _title_coords)
+
+        self.image.resize(self._image_size)
+        self.title_box.resize(_title_box_size)
+
+    def _set_position(self, _coords):
+        """ Position the lower-left corner of this UI component.
+
+        Parameters
+        ----------
+        coords: (float, float)
+            Absolute pixel coordinates (x, y).
+        """
+
+        self.panel.position = _coords
+
+    @property
+    def color(self):
+        """ Returns the background color of card.
+        """
+
+        return self.panel.color
+
+    @color.setter
+    def color(self, color):
+        """ Sets background color of card.
+
+        Parameters
+        ----------
+        color : list of 3 floats.
+        """
+
+        self.panel.color = color
+
+    @property
+    def body(self):
+        """ Returns the body text of the card.
+        """
+
+        return self.body_box.message
+
+    @body.setter
+    def body(self, text):
+        self.body_box.message = text
+
+    @property
+    def title(self):
+        """ Returns the title text of the card
+        """
+
+        return self.title_box.message
+
+    @title.setter
+    def title(self, text):
+        self.title_box.message = text
+
+    def left_button_pressed(self, i_ren, _obj, _sub_component):
+        click_pos = np.array(i_ren.event.position)
+        self._click_position = click_pos
+        i_ren.event.abort()
+
+    def left_button_dragged(self, i_ren, _obj, _sub_component):
+        click_position = np.array(i_ren.event.position)
+        change = click_position - self._click_position
+        self.panel.position += change
+        self._click_position = click_position
+        i_ren.force_render()
+
+
+class SpinBox(UI):
+    """SpinBox UI.
+    """
+
+    def __init__(self, position=(350, 400), size=(300, 100), padding=10,
+                 panel_color=(1, 1, 1), min_val=0, max_val=100,
+                 initial_val=50, step=1, max_column=10, max_line=2):
+        """Init this UI element.
+
+        Parameters
+        ----------
+        position : (int, int), optional
+            Absolute coordinates (x, y) of the lower-left corner of this
+            UI component.
+        size : (int, int), optional
+            Width and height in pixels of this UI component.
+        padding : int, optional
+            Distance between TextBox and Buttons.
+        panel_color : (float, float, float), optional
+            Panel color of SpinBoxUI.
+        min_val: int, optional
+            Minimum value of SpinBoxUI.
+        max_val: int, optional
+            Maximum value of SpinBoxUI.
+        initial_val: int, optional
+            Initial value of SpinBoxUI.
+        step: int, optional
+            Step value of SpinBoxUI.
+        max_column: int, optional
+            Max number of characters in a line.
+        max_line: int, optional
+            Max number of lines in the textbox.
+        """
+        self.panel_size = size
+        self.padding = padding
+        self.panel_color = panel_color
+        self.min_val = min_val
+        self.max_val = max_val
+        self.step = step
+        self.max_column = max_column
+        self.max_line = max_line
+
+        super(SpinBox, self).__init__(position)
+        self.value = initial_val
+        self.resize(size)
+
+        self.on_change = lambda ui: None
+
+    def _setup(self):
+        """Setup this UI component.
+
+        Create the SpinBoxUI with Background (Panel2D) and InputBox (TextBox2D)
+        and Increment,Decrement Button (Button2D).
+        """
+        self.panel = Panel2D(size=self.panel_size, color=self.panel_color)
+
+        self.textbox = TextBox2D(width=self.max_column,
+                                 height=self.max_line)
+        self.textbox.text.dynamic_bbox = False
+        self.textbox.text.auto_font_scale = True
+        self.increment_button = Button2D(
+            icon_fnames=[("up", read_viz_icons(fname="circle-up.png"))])
+        self.decrement_button = Button2D(
+            icon_fnames=[("down", read_viz_icons(fname="circle-down.png"))])
+
+        self.panel.add_element(self.textbox, (0, 0))
+        self.panel.add_element(self.increment_button, (0, 0))
+        self.panel.add_element(self.decrement_button, (0, 0))
+
+        # Adding button click callbacks
+        self.increment_button.on_left_mouse_button_pressed = \
+            self.increment_callback
+        self.decrement_button.on_left_mouse_button_pressed = \
+            self.decrement_callback
+        self.textbox.off_focus = self.textbox_update_value
+
+    def resize(self, size):
+        """Resize SpinBox.
+
+        Parameters
+        ----------
+        size : (float, float)
+            SpinBox size(width, height) in pixels.
+        """
+        self.panel_size = size
+        self.textbox_size = (int(0.7 * size[0]), int(0.8 * size[1]))
+        self.button_size = (int(0.2 * size[0]), int(0.3 * size[1]))
+        self.padding = int(0.03 * self.panel_size[0])
+
+        self.panel.resize(size)
+        self.textbox.text.resize(self.textbox_size)
+        self.increment_button.resize(self.button_size)
+        self.decrement_button.resize(self.button_size)
+
+        textbox_pos = (self.padding, int((size[1] - self.textbox_size[1])/2))
+        inc_btn_pos = (size[0] - self.padding - self.button_size[0],
+                       int((1.5*size[1] - self.button_size[1])/2))
+        dec_btn_pos = (size[0] - self.padding - self.button_size[0],
+                       int((0.5*size[1] - self.button_size[1])/2))
+
+        self.panel.update_element(self.textbox, textbox_pos)
+        self.panel.update_element(self.increment_button, inc_btn_pos)
+        self.panel.update_element(self.decrement_button, dec_btn_pos)
+
+    def _get_actors(self):
+        """Get the actors composing this UI component."""
+        return self.panel.actors
+
+    def _add_to_scene(self, scene):
+        """Add all subcomponents or VTK props that compose this UI component.
+
+        Parameters
+        ----------
+        scene : Scene
+
+        """
+        self.panel.add_to_scene(scene)
+
+    def _get_size(self):
+        return self.panel.size
+
+    def _set_position(self, coords):
+        """Set the lower-left corner position of this UI component.
+
+        Parameters
+        ----------
+        coords: (float, float)
+            Absolute pixel coordinates (x, y).
+        """
+        self.panel.center = coords
+
+    def increment_callback(self, i_ren, _obj, _button):
+        self.increment()
+        i_ren.force_render()
+        i_ren.event.abort()
+
+    def decrement_callback(self, i_ren, _obj, _button):
+        self.decrement()
+        i_ren.force_render()
+        i_ren.event.abort()
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, value):
+        if value >= self.max_val:
+            self._value = self.max_val
+        elif value <= self.min_val:
+            self._value = self.min_val
+        else:
+            self._value = value
+
+        self.textbox.set_message(str(self._value))
+
+    def validate_value(self, value):
+        """Validate and convert the given value into integer.
+
+        Parameters
+        ----------
+        value : str
+            Input value received from the textbox.
+
+        Returns
+        -------
+        int
+            If valid return converted integer else the previous value.
+        """
+        if value.isnumeric():
+            return int(value)
+
+        return self.value
+
+    def increment(self):
+        """Increment the current value by the step."""
+        current_val = self.validate_value(self.textbox.message)
+        self.value = current_val + self.step
+        self.on_change(self)
+
+    def decrement(self):
+        """Decrement the current value by the step."""
+        current_val = self.validate_value(self.textbox.message)
+        self.value = current_val - self.step
+        self.on_change(self)
+
+    def textbox_update_value(self, textbox):
+        self.value = self.validate_value(textbox.message)
+        self.on_change(self)
