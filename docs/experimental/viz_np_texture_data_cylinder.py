@@ -3,29 +3,14 @@ import os
 import numpy as np
 
 from fury import actor, window
-from fury.lib import FloatArray, ImageData, Texture, numpy_support
+from fury.lib import FloatArray, Texture
 from fury.shaders import (
     attribute_to_actor,
     compose_shader,
     import_fury_shader,
     shader_to_actor,
 )
-from fury.utils import set_polydata_tcoords
-
-
-def np_array_to_vtk_img(data):
-    grid = ImageData()
-    grid.SetDimensions(data.shape[1], data.shape[0], 1)
-    nd = data.shape[-1] if data.ndim == 3 else 1
-    vtkarr = numpy_support.numpy_to_vtk(
-        np.flip(data.swapaxes(0, 1), axis=1).reshape((-1, nd), order="F")
-    )
-    vtkarr.SetName("Image")
-    grid.GetPointData().AddArray(vtkarr)
-    grid.GetPointData().SetActiveScalars("Image")
-    grid.GetPointData().Update()
-    return grid
-
+from fury.utils import numpy_to_vtk_image_data, set_polydata_tcoords
 
 if __name__ == "__main__":
     scene = window.Scene()
@@ -60,8 +45,8 @@ if __name__ == "__main__":
         )
         * 255
     )
-    # grid = rgb_to_vtk(arr.astype(np.uint8))
-    grid = np_array_to_vtk_img(arr.astype(np.uint8))
+
+    grid = numpy_to_vtk_image_data(arr.astype(np.uint8))
 
     texture = Texture()
     texture.SetInputDataObject(grid)
