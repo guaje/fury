@@ -1,4 +1,6 @@
-void find_roots(out float out_roots[MAX_DEGREE + 1], float poly[MAX_DEGREE + 1], float begin, float end, int maxPolyDegree, float noIntersection) {
+void findRoots(out float out_roots[MAX_DEGREE + 1], float poly[MAX_DEGREE + 1], float begin, float end,
+    int maxPolyDegree, float noIntersection)
+{
     float tolerance = (end - begin) * 1.0e-4;
     // Construct the quadratic derivative of the polynomial. We divide each
     // derivative by the factorial of its order, such that the constant

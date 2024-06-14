@@ -76,7 +76,7 @@ void rayGlyphIntersections(out float outRayParams[MAX_DEGREE], float shCoeffs[SH
     }
     // Find roots of the polynomial within the relevant bounds
     float roots[MAX_DEGREE + 1];
-    find_roots(roots, poly, -uMax, uMax, maxPolyDegree, noIntersection);
+    findRoots(roots, poly, -uMax, uMax, maxPolyDegree, noIntersection);
     // Convert them back to the original coordinate frame (i.e. ray parameters)
     _unroll_
     for (int i = 0; i != maxPolyDegree; ++i)

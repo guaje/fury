@@ -242,7 +242,9 @@ if __name__ == "__main__":
     # Finds all roots of the given polynomial in the interval [begin, end] and
     # writes them to out_roots. Some entries will be NO_INTERSECTION but other
     # than that the array is sorted. The last entry is always NO_INTERSECTION.
-    find_roots = import_fury_shader(os.path.join("ray_traced", "odf", "find_roots.frag"))
+    find_roots = import_fury_shader(
+        os.path.join("ray_traced", "odf", "find_roots.frag")
+    )
 
     # Evaluates the spherical harmonics basis in bands 0, 2, ..., SH_DEGREE.
     # Conventions are as in the following paper.
