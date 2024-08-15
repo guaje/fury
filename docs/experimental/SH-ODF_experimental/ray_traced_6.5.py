@@ -374,7 +374,9 @@ if __name__ == "__main__":
     )
 
     # Logarithmic tonemapping operator. Input and output are linear RGB.
-    tonemap = import_fury_shader(os.path.join("ray_traced", "odf", "tonemap.frag"))
+    tonemap = import_fury_shader(
+        os.path.join("ray_traced", "odf", "tonemap.frag")
+    )
 
     # Blinn-Phong illumination model
     blinn_phong_model = import_fury_shader(
