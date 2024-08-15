@@ -1,6 +1,4 @@
-void findRoots(out float out_roots[MAX_DEGREE + 1], float poly[MAX_DEGREE + 1], float begin, float end,
-    int maxPolyDegree, float noIntersection)
-{
+void findRoots(out float outRoots[MAX_DEGREE + 1], float poly[MAX_DEGREE + 1], float begin, float end, int maxPolyDegree, float noIntersection) {
     float tolerance = (end - begin) * 1.0e-4;
     // Construct the quadratic derivative of the polynomial. We divide each
     // derivative by the factorial of its order, such that the constant
@@ -21,20 +19,20 @@ void findRoots(out float out_roots[MAX_DEGREE + 1], float poly[MAX_DEGREE + 1], 
         float scaled_root = derivative[1] + ((derivative[1] > 0.0) ? sqrt_discriminant : (-sqrt_discriminant));
         float root_0 = clamp(-2.0 * derivative[0] / scaled_root, begin, end);
         float root_1 = clamp(-0.5 * scaled_root / derivative[2], begin, end);
-        out_roots[maxPolyDegree - 2] = min(root_0, root_1);
-        out_roots[maxPolyDegree - 1] = max(root_0, root_1);
+        outRoots[maxPolyDegree - 2] = min(root_0, root_1);
+        outRoots[maxPolyDegree - 1] = max(root_0, root_1);
     }
     else {
         // Indicate that the cubic derivative has a single root
-        out_roots[maxPolyDegree - 2] = begin;
-        out_roots[maxPolyDegree - 1] = begin;
+        outRoots[maxPolyDegree - 2] = begin;
+        outRoots[maxPolyDegree - 1] = begin;
     }
     // The last entry in the root array is set to end to make it easier to
     // iterate over relevant intervals, all untouched roots are set to begin
-    out_roots[maxPolyDegree] = end;
+    outRoots[maxPolyDegree] = end;
     _unroll_
     for (int i = 0; i != maxPolyDegree - 2; ++i)
-        out_roots[i] = begin;
+        outRoots[i] = begin;
     // Work your way up to derivatives of higher degree until you reach the
     // polynomial itself. This implementation may seem peculiar: It always
     // treats the derivative as though it had degree MAX_DEGREE and it
@@ -66,19 +64,19 @@ void findRoots(out float out_roots[MAX_DEGREE + 1], float poly[MAX_DEGREE + 1], 
         for (int i = 0; i != maxPolyDegree; ++i) {
             if (i < maxPolyDegree - degree)
                 continue;
-            float current_begin = out_roots[i];
-            float current_end = out_roots[i + 1];
+            float current_begin = outRoots[i];
+            float current_end = outRoots[i + 1];
             // Try to find a root
             float root;
             if (newtonBisection(root, begin_value, derivative, current_begin, current_end, begin_value, tolerance, maxPolyDegree))
-                out_roots[i] = root;
+                outRoots[i] = root;
             else if (degree < maxPolyDegree)
                 // Create an empty interval for the next iteration
-                out_roots[i] = out_roots[i - 1];
+                outRoots[i] = outRoots[i - 1];
             else
-                out_roots[i] = noIntersection;
+                outRoots[i] = noIntersection;
         }
     }
     // We no longer need this array entry
-    out_roots[maxPolyDegree] = noIntersection;
+    outRoots[maxPolyDegree] = noIntersection;
 }

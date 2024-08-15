@@ -39,23 +39,15 @@ def uv_calculations(n):
     return uvs
 
 
-if __name__ == "__main__":
-    show_man = window.ShowManager(size=(1280, 720))
-
-    dataset_dir = os.path.join(dipy_home, "stanford_hardi")
-
-    coeffs, affine = load_nifti(
-        os.path.join(dataset_dir, "odf_debug_sh_coeffs_9x11x28(6).nii.gz")
-        # os.path.join(dataset_dir, "odf_slice_2.nii.gz")
-    )
-
+def odf(coeffs, deg):
     max_num_coeffs = coeffs.shape[-1]
 
     max_sh_degree = int((np.sqrt(8 * max_num_coeffs + 1) - 3) / 2)
 
+    print(max_sh_degree)
     max_poly_degree = 2 * max_sh_degree + 2
 
-    viz_sh_degree = max_sh_degree
+    viz_sh_degree = deg #max_sh_degree
 
     valid_mask = np.abs(coeffs).max(axis=(-1)) > 0
     indices = np.nonzero(valid_mask)
@@ -242,9 +234,7 @@ if __name__ == "__main__":
     # Finds all roots of the given polynomial in the interval [begin, end] and
     # writes them to out_roots. Some entries will be NO_INTERSECTION but other
     # than that the array is sorted. The last entry is always NO_INTERSECTION.
-    find_roots = import_fury_shader(
-        os.path.join("ray_traced", "odf", "find_roots.frag")
-    )
+    find_roots = import_fury_shader(os.path.join("ray_traced", "odf", "find_roots.frag"))
 
     # Evaluates the spherical harmonics basis in bands 0, 2, ..., SH_DEGREE.
     # Conventions are as in the following paper.
@@ -318,9 +308,69 @@ if __name__ == "__main__":
 
     # Evaluates the gradient of each basis function given by eval_sh() and the
     # basis itself
-    eval_sh_grad = import_fury_shader(
-        os.path.join("rt_odfs", "eval_sh_grad.frag")
-    )
+    eval_sh_grad = import_fury_shader(os.path.join("rt_odfs", "eval_sh_grad.frag"))
+    """
+    void evalShGrad(out float outSH[SH_COUNT], out vec3 outGrads[SH_COUNT], vec3 point, int shDegree,
+        int numCoeffs)
+    {
+        if (shDegree == 2)
+        {
+            float tmpOutSH[6];
+            float tmpOutGrads[6];
+            #if SH_DEGREE == 2
+                eval_sh_grad_2(tmpOutSH, point);
+            #endif
+            for (int i = 0; i != numCoeffs; ++i)
+                outSH[i] = tmpOutSH[i];
+                
+        }
+        else if (shDegree == 4)
+        {
+            float tmpOutSH[15];
+            #if SH_DEGREE == 4
+                eval_sh_grad_4(tmpOutSH, point);
+            #endif
+            for (int i = 0; i != numCoeffs; ++i)
+                outSH[i] = tmpOutSH[i];
+        }
+        else if (shDegree == 6)
+        {
+            float tmpOutSH[28];
+            #if SH_DEGREE == 6
+                eval_sh_grad_6(tmpOutSH, point);
+            #endif
+            for (int i = 0; i != numCoeffs; ++i)
+                outSH[i] = tmpOutSH[i];
+        }
+        else if (shDegree == 8)
+        {
+            float tmpOutSH[45];
+            #if SH_DEGREE == 8
+                eval_sh_grad_8(tmpOutSH, point);
+            #endif
+            for (int i = 0; i != numCoeffs; ++i)
+                outSH[i] = tmpOutSH[i];
+        }
+        else if (shDegree == 10)
+        {
+            float tmpOutSH[66];
+            #if SH_DEGREE == 10
+                eval_sh_grad_10(tmpOutSH, point);
+            #endif
+            for (int i = 0; i != numCoeffs; ++i)
+                outSH[i] = tmpOutSH[i];
+        }
+        else if (shDegree == 12)
+        {
+            float tmpOutSH[91];
+            #if SH_DEGREE == 12
+                eval_sh_grad_12(tmpOutSH, point);
+            #endif
+            for (int i = 0; i != numCoeffs; ++i)
+                outSH[i] = tmpOutSH[i];
+        }
+    }
+    """
 
     # Outputs a matrix that turns equidistant samples on the unit circle of a
     # homogeneous polynomial into coefficients of that polynomial.
@@ -437,8 +487,8 @@ if __name__ == "__main__":
     first_intersection = """
     float first_ray_param = NO_INTERSECTION;
     _unroll_
-    //for (int i = 0; i != MAX_DEGREE; ++i) {
-    for (int i = 0; i != maxPolyDegreeVSOutput; ++i) {
+    for (int i = 0; i != MAX_DEGREE; ++i) {
+    //for (int i = 0; i != maxPolyDegreeVSOutput; ++i) {
         if (ray_params[i] != NO_INTERSECTION && ray_params[i] > 0.0) {
             first_ray_param = ray_params[i];
             break;
@@ -453,7 +503,7 @@ if __name__ == "__main__":
         vec3 intersection = ro - centerMCVSOutput + first_ray_param * rd;
         vec3 normal = getShGlyphNormal(sh_coeffs, intersection, int(numCoeffsVSOutput));
         vec3 colorDir = srgbToLinearRgb(abs(normalize(intersection)));
-        float attenuation = dot(ld, normal);
+        float attenuation = ld.z;//dot(ld, normal);
         color = blinnPhongIllumModel(
             //attenuation, lightColor0, diffuseColor, specularPower,
             attenuation, lightColor0, colorDir, specularPower,
@@ -476,8 +526,32 @@ if __name__ == "__main__":
         intersection_test, first_intersection, directional_light, frag_output
     ])
     # fmt: on
-
+    
     shader_to_actor(odf_actor, "fragment", impl_code=fs_impl, block="picking")
+
+    return odf_actor
+
+if __name__ == "__main__":
+    show_man = window.ShowManager(size=(1280, 720))
+
+    coeffs = np.array([[[
+        [
+            -0.2739740312099, 0.2526670396328, 1.8922271728516, 0.2878578901291,
+            -0.5339795947075, -0.2620058953762, 0.1580424904823, 0.0329004973173,
+            -0.1322413831949, -0.1332057565451, 1.0894461870193, -0.6319401264191,
+            -0.0416776277125, -1.0772529840469,  0.1423762738705, 0.7941166162491,
+            0.7490307092667, -0.3428381681442, 0.1024847552180, -0.0219132602215,
+            0.0499043911695, 0.2162453681231, 0.0921059995890, -0.2611238956451,
+            0.2549301385880, -0.4534865319729, 0.1922748684883, -0.6200597286224,
+            -0.0532187558711, -0.3569841980934, 0.0293972902000, -0.1977960765362,
+            -0.1058669015765, 0.2372217923403, -0.1856198310852, -0.3373193442822,
+            -0.0750469490886, 0.2146576642990, -0.0490148440003, 0.1288588196039,
+            0.3173974752426, 0.1990085393190, -0.1736343950033, -0.0482443645597,
+            0.1749017387629
+        ]
+    ]]])
+    
+    odf_actor = odf(coeffs=coeffs, deg=8)
     show_man.scene.add(odf_actor)
 
     show_man.start()
