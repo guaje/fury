@@ -191,8 +191,8 @@ if __name__ == "__main__":
     }
     """
 
-    # sh_basis = "descoteaux"
-    sh_basis = "tournier"
+    sh_basis = "descoteaux"
+    # sh_basis = "tournier"
 
     eval_sh_2 = import_fury_shader(
         os.path.join("rt_odfs", sh_basis, "eval_sh_2.frag")
