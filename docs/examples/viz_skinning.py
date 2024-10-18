@@ -12,7 +12,7 @@ import fury
 # Retrieving the model with skeletal animations.
 # We're choosing the `RiggedFigure` model here.
 
-fury.data.fetch_gltf("RiggedFigure", "glTF")
+fury.data.fetch_gltf(name="RiggedFigure", mode="glTF")
 filename = fury.data.read_viz_gltf("RiggedFigure")
 
 ##############################################################################
@@ -43,7 +43,7 @@ gltf_obj.initialize_skin(animation, bones=False)
 
 scene = fury.window.Scene()
 showm = fury.window.ShowManager(
-    scene, size=(900, 768), reset_camera=True, order_transparent=True
+    scene=scene, size=(900, 768), reset_camera=True, order_transparent=True
 )
 showm.initialize()
 scene.add(animation)
@@ -71,4 +71,4 @@ interactive = False
 if interactive:
     showm.start()
 
-fury.window.record(scene, out_path="viz_skinning.png", size=(900, 768))
+fury.window.record(scene=scene, out_path="viz_skinning.png", size=(900, 768))

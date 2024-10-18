@@ -30,7 +30,7 @@ scene.add(cube)
 sphere = fury.actor.sphere(np.add(centers, np.array([0, 2, 0])), colors=colors)
 scene.add(sphere)
 
-fury.data.fetch_gltf("BoxTextured", "glTF")
+fury.data.fetch_gltf(name="BoxTextured", mode="glTF")
 filename = fury.data.read_viz_gltf("BoxTextured")
 gltf_obj = fury.gltf.glTF(filename)
 box_actor = gltf_obj.actors()
@@ -64,4 +64,4 @@ interactive = False
 if interactive:
     fury.window.show(scene, size=(1280, 720))
 
-fury.window.record(scene, out_path="viz_gltf_export.png", size=(1280, 720))
+fury.window.record(scene=scene, out_path="viz_gltf_export.png", size=(1280, 720))
