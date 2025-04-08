@@ -123,7 +123,9 @@ interactive = False
 if interactive:
     fury.window.show(scene)
 
-fury.window.record(scene=scene, size=(600, 600), out_path="viz_poly_cylinder.png")
+fury.window.record(
+    scene=scene, size=(600, 600), out_path="viz_poly_cylinder.png"
+)
 
 ###############################################################################
 # Visualize the surface geometry representation for the object.
@@ -135,7 +137,9 @@ cylinders_32.GetProperty().SetRepresentationToWireframe()
 if interactive:
     fury.window.show(scene)
 
-fury.window.record(scene=scene, size=(600, 600), out_path="viz_poly_cylinder_geom.png")
+fury.window.record(
+    scene=scene, size=(600, 600), out_path="viz_poly_cylinder_geom.png"
+)
 
 ###############################################################################
 # Then we clean the scene to render the boxes we will use to render our
@@ -219,7 +223,9 @@ vs_impl = """
 # to apply our implementation to the shader creation process, this function
 # joins our code to the shader template that FURY has by default.
 
-fury.shaders.shader_to_actor(box_actor, "vertex", decl_code=vs_dec, impl_code=vs_impl)
+fury.shaders.shader_to_actor(
+    box_actor, "vertex", decl_code=vs_dec, impl_code=vs_impl
+)
 
 ###############################################################################
 # Fragment shaders are used to define the colors of each pixel being processed,
@@ -253,7 +259,9 @@ vec_to_vec_rot_mat = fury.shaders.import_fury_shader(
 ###############################################################################
 # We calculate the distance using the SDF function for the cylinder.
 
-sd_cylinder = fury.shaders.import_fury_shader(os.path.join("sdf", "sd_cylinder.frag"))
+sd_cylinder = fury.shaders.import_fury_shader(
+    os.path.join("sdf", "sd_cylinder.frag")
+)
 
 ###############################################################################
 # This is used on calculations for surface normals of the cylinder.
@@ -271,6 +279,16 @@ sdf_map = """
 
         // distance to the cylinder's boundary
         return sdCylinder(pos, radiusVSOutput, heightVSOutput / 2);
+    }
+    """
+
+###############################################################################
+# To use the central differences technique, we need to define a `sdfEval`
+# function that wraps our SDF and evaluates only a point.
+sdf_eval = """
+    float sdfEval(vec3 p)
+    {
+        return map(p);
     }
     """
 
@@ -304,6 +322,7 @@ fs_dec = fury.shaders.compose_shader(
         vec_to_vec_rot_mat,
         sd_cylinder,
         sdf_map,
+        sdf_eval,
         central_diffs_normal,
         cast_ray,
         blinn_phong_model,
@@ -360,7 +379,9 @@ scene.add(box_actor)
 if interactive:
     fury.window.show(scene)
 
-fury.window.record(scene=scene, size=(600, 600), out_path="viz_sdf_cylinder.png")
+fury.window.record(
+    scene=scene, size=(600, 600), out_path="viz_sdf_cylinder.png"
+)
 
 ###############################################################################
 # References

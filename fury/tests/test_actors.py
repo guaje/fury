@@ -7,18 +7,16 @@ import numpy.testing as npt
 import pytest
 from scipy.ndimage import center_of_mass
 
-from fury import actor, primitive as fp, shaders, window
+from fury import actor
+from fury import primitive as fp
+from fury import shaders, window
 from fury.actor import grid
 from fury.decorators import skip_linux, skip_osx, skip_win
 
 # Allow import, but disable doctests if we don't have dipy
 from fury.optpkg import optional_package
 from fury.primitive import prim_sphere
-from fury.testing import (
-    assert_greater,
-    assert_greater_equal,
-    assert_not_equal,
-)
+from fury.testing import assert_greater, assert_greater_equal, assert_not_equal
 from fury.utils import primitives_count_from_actor, rotate, shallow_copy
 
 # dipy, have_dipy, _ = optional_package('dipy')
@@ -47,7 +45,9 @@ def test_slicer(verbose=False):
     scene = window.Scene()
     data = 255 * np.random.rand(50, 50, 50)
     affine = np.eye(4)
-    slicer = actor.slicer(data, affine=affine, value_range=[data.min(), data.max()])
+    slicer = actor.slicer(
+        data, affine=affine, value_range=[data.min(), data.max()]
+    )
     slicer.display(x=None, y=None, z=25)
     scene.add(slicer)
 
@@ -85,16 +85,8 @@ def test_slicer(verbose=False):
 
     # Test Errors
     data_4d = 255 * np.random.rand(50, 50, 50, 50)
-    npt.assert_raises(
-        ValueError,
-        actor.slicer,
-        data_4d,
-    )
-    npt.assert_raises(
-        ValueError,
-        actor.slicer,
-        np.ones(10),
-    )
+    npt.assert_raises(ValueError, actor.slicer, data_4d)
+    npt.assert_raises(ValueError, actor.slicer, np.ones(10))
 
     scene.clear()
 
@@ -194,7 +186,9 @@ def test_surface():
                 )
                 scene.add(surface_actor)
                 # window.show(scene, size=(600, 600), reset_camera=False)
-                arr = window.snapshot(scene, fname="test_surface.png", offscreen=True)
+                arr = window.snapshot(
+                    scene, fname="test_surface.png", offscreen=True
+                )
                 report = window.analyze_snapshot(arr, find_objects=True)
                 npt.assert_equal(report.objects, 1)
 
@@ -294,10 +288,16 @@ def test_contour_from_label(interactive=False):
         window.show(scene2)
 
     arr = window.snapshot(
-        scene, fname="test_surface.png", offscreen=True, order_transparent=False
+        scene,
+        fname="test_surface.png",
+        offscreen=True,
+        order_transparent=False,
     )
     arr2 = window.snapshot(
-        scene2, fname="test_surface2.png", offscreen=True, order_transparent=True
+        scene2,
+        fname="test_surface2.png",
+        offscreen=True,
+        order_transparent=True,
     )
 
     report = window.analyze_snapshot(
@@ -405,7 +405,9 @@ def test_bundle_maps():
         value_range=(1.0, 1),
     )
 
-    line = actor.line(bundle, colors=metric, linewidth=0.1, lookup_colormap=lut)
+    line = actor.line(
+        bundle, colors=metric, linewidth=0.1, lookup_colormap=lut
+    )
     scene.add(line)
     scene.add(actor.scalar_bar(lookup_table=lut, title=" "))
 
@@ -420,7 +422,9 @@ def test_bundle_maps():
     values = 100 * np.random.rand(nb_points)
     # values[:nb_points/2] = 0
 
-    line = actor.streamtube(bundle, colors=values, linewidth=0.1, lookup_colormap=lut)
+    line = actor.streamtube(
+        bundle, colors=values, linewidth=0.1, lookup_colormap=lut
+    )
     scene.add(line)
     # window.show(scene)
 
@@ -480,7 +484,12 @@ def test_odf_slicer(interactive=False):
 
     # Test that affine and mask work
     odf_actor = actor.odf_slicer(
-        odfs, sphere=sphere, affine=affine, mask=mask, scale=0.25, colormap="blues"
+        odfs,
+        sphere=sphere,
+        affine=affine,
+        mask=mask,
+        scale=0.25,
+        colormap="blues",
     )
 
     k = 2
@@ -577,7 +586,12 @@ def test_odf_slicer(interactive=False):
     # Dimension mismatch between sphere vertices and number
     # of SF coefficients will raise an error.
     npt.assert_raises(
-        ValueError, actor.odf_slicer, odfs, mask=None, sphere=sphere2, scale=0.25
+        ValueError,
+        actor.odf_slicer,
+        odfs,
+        mask=None,
+        sphere=sphere2,
+        scale=0.25,
     )
 
     # colormap=None and global_cm=False results in directionally encoded colors
@@ -695,19 +709,27 @@ def test_peak():
 
     # 3D vals data
     vals_data_3d = np.random.rand(3, 4, 5)
-    npt.assert_raises(ValueError, actor.peak, valid_dirs, peaks_values=vals_data_3d)
+    npt.assert_raises(
+        ValueError, actor.peak, valid_dirs, peaks_values=vals_data_3d
+    )
 
     # 5D vals data
     vals_data_5d = np.random.rand(6, 7, 8, 9, 10)
-    npt.assert_raises(ValueError, actor.peak, valid_dirs, peaks_values=vals_data_5d)
+    npt.assert_raises(
+        ValueError, actor.peak, valid_dirs, peaks_values=vals_data_5d
+    )
 
     # Diff vals data #1
     vals_data_diff_1 = np.random.rand(3, 4, 5, 9)
-    npt.assert_raises(ValueError, actor.peak, valid_dirs, peaks_values=vals_data_diff_1)
+    npt.assert_raises(
+        ValueError, actor.peak, valid_dirs, peaks_values=vals_data_diff_1
+    )
 
     # Diff vals data #2
     vals_data_diff_2 = np.random.rand(7, 8, 9, 10)
-    npt.assert_raises(ValueError, actor.peak, valid_dirs, peaks_values=vals_data_diff_2)
+    npt.assert_raises(
+        ValueError, actor.peak, valid_dirs, peaks_values=vals_data_diff_2
+    )
 
     # 2D mask
     mask_2d = np.random.rand(2, 3)
@@ -915,12 +937,18 @@ def test_vector_text(interactive=False):
     center = np.array(text_actor.GetCenter())
     [assert_greater_equal(v, 0) for v in center]
 
-    text_actor_centered = actor.vector_text(text="FURY Rocks", align_center=True)
+    text_actor_centered = actor.vector_text(
+        text="FURY Rocks", align_center=True
+    )
     center = np.array(text_actor_centered.GetCenter())
     npt.assert_equal(center, np.zeros(3))
 
-    text_actor_rot_1 = actor.vector_text(text="FURY Rocks", direction=(1, 1, 1))
-    text_actor_rot_2 = actor.vector_text(text="FURY Rocks", direction=(1, 1, 0))
+    text_actor_rot_1 = actor.vector_text(
+        text="FURY Rocks", direction=(1, 1, 1)
+    )
+    text_actor_rot_2 = actor.vector_text(
+        text="FURY Rocks", direction=(1, 1, 0)
+    )
     center_1 = text_actor_rot_1.GetCenter()
     center_2 = text_actor_rot_2.GetCenter()
     assert_not_equal(np.linalg.norm(center_1), np.linalg.norm(center_2))
@@ -1046,7 +1074,9 @@ def test_cones_vertices_faces(interactive=False):
     scene = window.Scene()
     centers = np.array([[0, 0, 0], [20, 0, 0], [40, 0, 0], [60, 0, 0]])
     directions = np.array([[0, 1, 0], [1, 0, 0], [0, 0, 1], [1, 1, 1]])
-    colors = np.array([[1, 0, 0, 0.3], [0, 1, 0, 0.4], [0, 0, 1, 0.99], [1, 1, 1, 0.6]])
+    colors = np.array(
+        [[1, 0, 0, 0.3], [0, 1, 0, 0.4], [0, 0, 1, 0.99], [1, 1, 1, 0.6]]
+    )
     vertices = np.array(
         [[0.0, 0.0, 0.0], [0.0, 10.0, 0.0], [10.0, 0.0, 0.0], [0.0, 0.0, 10.0]]
     )
@@ -1087,7 +1117,10 @@ def test_cones_vertices_faces(interactive=False):
     )
 
     cone_2 = actor.cone(
-        centers=centers[2:], directions=directions[2:], colors=colors[2:], heights=10
+        centers=centers[2:],
+        directions=directions[2:],
+        colors=colors[2:],
+        heights=10,
     )
     scene.add(cone_1)
     scene.add(cone_2)
@@ -1154,7 +1187,10 @@ def test_advanced_geometry_actor(interactive=False):
         [actor.cone, {"heights": heights, "resolution": 8}],
         [actor.arrow, {"scales": heights, "resolution": 9}],
         [actor.cylinder, {"heights": heights, "resolution": 10}],
-        [actor.disk, {"rinner": 4, "router": 8, "rresolution": 2, "cresolution": 2}],
+        [
+            actor.disk,
+            {"rinner": 4, "router": 8, "rresolution": 2, "cresolution": 2},
+        ],
     ]
 
     scene = window.Scene()
@@ -1218,7 +1254,9 @@ def test_text_3d():
     txt_actor.vertical_justification("bottom")
     scene.add(txt_actor)
     arr_bottom = window.snapshot(scene, size=(1920, 1080), offscreen=True)
-    assert_greater_equal(center_of_mass(arr_top)[0], center_of_mass(arr_bottom)[0])
+    assert_greater_equal(
+        center_of_mass(arr_top)[0], center_of_mass(arr_bottom)[0]
+    )
 
     scene.clear()
     txt_actor.font_style(bold=True, italic=True, shadow=True)
@@ -1245,8 +1283,12 @@ def test_container():
     container_shallow_copy.add(actor.axes())
 
     assert_greater(len(container_shallow_copy), len(container))
-    npt.assert_equal(container_shallow_copy.GetPosition(), container.GetPosition())
-    npt.assert_equal(container_shallow_copy.GetVisibility(), container.GetVisibility())
+    npt.assert_equal(
+        container_shallow_copy.GetPosition(), container.GetPosition()
+    )
+    npt.assert_equal(
+        container_shallow_copy.GetVisibility(), container.GetVisibility()
+    )
 
     # Check is the shallow_copy do not modify original container
     container_shallow_copy.SetVisibility(False)
@@ -1260,29 +1302,20 @@ def test_grid(_interactive=False):
     vol1 = np.zeros((100, 100, 100))
     vol1[25:75, 25:75, 25:75] = 100
     contour_actor1 = actor.contour_from_roi(
-        vol1,
-        affine=np.eye(4),
-        color=(1.0, 0, 0),
-        opacity=1.0,
+        vol1, affine=np.eye(4), color=(1.0, 0, 0), opacity=1.0
     )
 
     vol2 = np.zeros((100, 100, 100))
     vol2[25:75, 25:75, 25:75] = 100
 
     contour_actor2 = actor.contour_from_roi(
-        vol2,
-        affine=np.eye(4),
-        color=(1.0, 0.5, 0),
-        opacity=1.0,
+        vol2, affine=np.eye(4), color=(1.0, 0.5, 0), opacity=1.0
     )
     vol3 = np.zeros((100, 100, 100))
     vol3[25:75, 25:75, 25:75] = 100
 
     contour_actor3 = actor.contour_from_roi(
-        vol3,
-        affine=np.eye(4),
-        color=(1.0, 0.5, 0.5),
-        opacity=1.0,
+        vol3, affine=np.eye(4), color=(1.0, 0.5, 0.5), opacity=1.0
     )
 
     scene = window.Scene()
@@ -1497,7 +1530,10 @@ def test_matplotlib_figure():
         scene, fname="test_mpl.png", order_transparent=False, offscreen=True
     )
     _ = window.analyze_snapshot(
-        display, bg_color=(255, 255, 255.0), colors=[(31, 119, 180)], find_objects=False
+        display,
+        bg_color=(255, 255, 255.0),
+        colors=[(31, 119, 180)],
+        find_objects=False,
     )
     # omit assert from now until we know why snapshot creates
     # different colors in Github Actions but not on our computers
@@ -1613,7 +1649,11 @@ def test_billboard_actor(interactive=False):
     rotations = [[87, 0, -87, 87], [87, 0, -87, 87], [0, 87, 87, -87]]
     for i in range(3):
         billboard = actor.billboard(
-            centers, colors=colors, scales=scales, bb_type=b_type[i], fs_impl=b_point
+            centers,
+            colors=colors,
+            scales=scales,
+            bb_type=b_type[i],
+            fs_impl=b_point,
         )
 
         scene.add(billboard)
@@ -1755,8 +1795,12 @@ def test_marker_actor(interactive=False):
     scene.background((1, 1, 1))
     centers_3do = np.array([[4, 0, 0], [4, 4, 0], [4, 8, 0]])
     markers_2d = ["o", "s", "d", "^", "p", "h", "s6", "x", "+"]
-    center_markers_2d = np.array([[0, i * 2, 0] for i in range(len(markers_2d))])
-    fake_spheres = actor.markers(centers_3do, colors=(0, 1, 0), scales=1, marker="3d")
+    center_markers_2d = np.array(
+        [[0, i * 2, 0] for i in range(len(markers_2d))]
+    )
+    fake_spheres = actor.markers(
+        centers_3do, colors=(0, 1, 0), scales=1, marker="3d"
+    )
     markers_2d = actor.markers(
         center_markers_2d, colors=(0, 1, 0), scales=1, marker=markers_2d
     )
@@ -1776,7 +1820,10 @@ def test_marker_actor(interactive=False):
 def test_ellipsoid_actor(interactive=False):
     # number of axes does not match with number of centers
     centers = [-1, 1, 0]
-    axes = [[[1, 0, 0], [0, 1, 0], [0, 0, 1]], [[1, 2, -2], [2, 1, 2], [2, -2, -1]]]
+    axes = [
+        [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+        [[1, 2, -2], [2, 1, 2], [2, -2, -1]],
+    ]
     lengths = [[1, 1, 1]]
     npt.assert_raises(ValueError, actor.ellipsoid, centers, axes, lengths)
 
@@ -1870,7 +1917,11 @@ def test_uncertainty_cone_actor(interactive=False):
     )
 
     uncert_cones = actor.uncertainty_cone(
-        evecs=mevecs, evals=mevals, signal=signal, sigma=sigma, b_matrix=b_matrix
+        evecs=mevecs,
+        evals=mevals,
+        signal=signal,
+        sigma=sigma,
+        b_matrix=b_matrix,
     )
     scene.add(uncert_cones)
 
@@ -1892,7 +1943,11 @@ def test_uncertainty_cone_actor(interactive=False):
 
     signal = np.ones((4, 4, 4, 10))
     uncert_cones = actor.uncertainty_cone(
-        evecs=mevecs, evals=mevals, signal=signal, sigma=sigma, b_matrix=b_matrix
+        evecs=mevecs,
+        evals=mevals,
+        signal=signal,
+        sigma=sigma,
+        b_matrix=b_matrix,
     )
     scene.add(uncert_cones)
 

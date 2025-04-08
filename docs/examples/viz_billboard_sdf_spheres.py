@@ -32,8 +32,9 @@ Let's start by importing the necessary modules:
 
 import os
 
-import fury
 import numpy as np
+
+import fury
 from fury.shaders import compose_shader, import_fury_shader
 from fury.utils import represent_actor_as_wireframe
 
@@ -62,7 +63,15 @@ centers = np.array(
     ]
 )
 colors = np.array(
-    [[1, 1, 0], [1, 0, 1], [0, 0, 1], [1, 1, 1], [1, 0, 0], [0, 1, 0], [0, 1, 1]]
+    [
+        [1, 1, 0],
+        [1, 0, 1],
+        [0, 0, 1],
+        [1, 1, 1],
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 1, 1],
+    ]
 )
 scales = np.array([6, 1.2, 1, 0.2, 0.7, 3, 2])
 spheres_actor = fury.actor.sphere(
@@ -80,7 +89,9 @@ interactive = False
 if interactive:
     fury.window.show(scene)
 else:
-    fury.window.record(scene=scene, size=(600, 600), out_path="viz_regular_spheres.png")
+    fury.window.record(
+        scene=scene, size=(600, 600), out_path="viz_regular_spheres.png"
+    )
 
 ###############################################################################
 # Now, let's explore our scene to understand what we have created. Traditional
@@ -210,13 +221,15 @@ scene.clear()
 # into detail in the gradient and derivatives of SDFs, so we will use the
 # central differences technique implemented in the following FURY shader
 # function:
-central_diffs_normal = import_fury_shader(os.path.join("sdf", "central_diffs.frag"))
+central_diffs_normal = import_fury_shader(
+    os.path.join("sdf", "central_diffs.frag")
+)
 
 ###############################################################################
-# To use the central differences technique, we need to define a map function
-# that wraps our SDF and evaluates only a point.
-sd_sphere_normal = """
-    float map(vec3 p)
+# To use the central differences technique, we need to define a `sdfEval`
+# function that wraps our SDF and evaluates only a point.
+sdf_eval = """
+    float sdfEval(vec3 p)
     {
         return sdSphere(p, RADIUS);
     }
@@ -235,7 +248,7 @@ fs_dec = compose_shader(
     [
         sphere_radius,
         sd_sphere,
-        sd_sphere_normal,
+        sdf_eval,
         central_diffs_normal,
         blinn_phong_model,
     ]
@@ -275,7 +288,15 @@ frag_output = "fragOutput0 = vec4(color, opacity);"
 ###############################################################################
 # As before, we can bring our implementation code together.
 fs_impl = compose_shader(
-    [sphere_dist, sdf_eval, abs_dist, normal, light_attenuation, color, frag_output]
+    [
+        sphere_dist,
+        sdf_eval,
+        abs_dist,
+        normal,
+        light_attenuation,
+        color,
+        frag_output,
+    ]
 )
 
 ###############################################################################

@@ -6,8 +6,10 @@ import warnings
 
 import numpy as np
 
+from dipy.data import get_sphere
 from fury import layout as lyt
 from fury.actors.odf import sh_odf
+from fury.actors.odf_calc import sh_odf_calc
 from fury.actors.odf_slicer import OdfSlicerActor
 from fury.actors.peak import PeakActor
 from fury.actors.tensor import (
@@ -4084,3 +4086,61 @@ def odf(centers, coeffs, sh_basis="descoteaux", scales=1.0, opacity=1.0):
     coeffs = np.dot(np.diag(1 / total * scales), coeffs) * 1.7
 
     return sh_odf(centers, coeffs, degree, sh_basis, scales, opacity)
+
+
+def odf_impl(centers, coeffs, sphere_type="repulsion100", scales=.5, opacity=1.0):
+    """
+    FURY actor for visualizing Orientation Distribution Functions (ODFs) using descoteaux07 basis given an array of Spherical Harmonics (SH) coefficients.
+
+    Parameters
+    ----------
+    centers : ndarray(N, 3)
+        ODFs positions.
+    coeffs : (N, 15) ndarray.
+        Corresponding SH coefficients for the ODFs.
+    sphere : dipy Sphere
+        The sphere used for max SF calculation to normalize odfs. If None, a default sphere of 100 vertices is used.
+    scales : float or ndarray (N, ), optional
+        ODFs size.
+    opacity : float, optional
+        Takes values from 0 (fully transparent) to 1 (opaque).
+
+    Returns
+    -------
+    odf: Actor
+
+    """
+
+    if sphere_type is None:
+        sphere_type = "repulsion100"
+
+    if not isinstance(centers, np.ndarray):
+        centers = np.array(centers)
+    if centers.ndim == 1:
+        centers = np.array([centers])
+
+    if not isinstance(coeffs, np.ndarray):
+        coeffs = np.array(coeffs)
+    if coeffs.ndim != 2:
+        if coeffs.ndim == 1:
+            coeffs = np.array([coeffs])
+        else:
+            raise ValueError("coeffs should be a 2D array.")
+    if coeffs.shape[0] != centers.shape[0]:
+        raise ValueError(
+            "number of odf glyphs defined does not match with number of centers"
+        )
+
+    if not isinstance(scales, np.ndarray):
+        scales = np.array(scales)
+    if scales.size == 1:
+        scales = np.repeat(scales, centers.shape[0])
+    elif scales.size != centers.shape[0]:
+        scales = np.concatenate(
+            (scales, np.ones(centers.shape[0] - scales.shape[0])), axis=None
+        )
+
+    #total = np.sum(abs(coeffs), axis=1)
+    #coeffs = np.dot(np.diag(1 / total * scales), coeffs) * 1.7
+
+    return sh_odf_calc(centers, coeffs, sphere_type, scales, opacity)
