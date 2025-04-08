@@ -468,7 +468,7 @@ def main_dir_uncertainty(evals, evecs, signal, sigma, b_matrix):
         D_ = evecs
         eigen_vals = evals[i]
 
-        e1, e2, e3 = (np.array(D_[i, :, 0]), np.array(D_[i, :, 1]), np.array(D_[i, :, 2]))
+        e1, e2, e3 = np.array(D_[i, :, 0]), np.array(D_[i, :, 1]), np.array(D_[i, :, 2])
         lambda1, lambda2, lambda3 = eigen_vals[0], eigen_vals[1], eigen_vals[2]
 
         if lambda1 > lambda2 and lambda1 > lambda3:
