@@ -1,15 +1,14 @@
 """Module that provide actors to render."""
 
-from functools import partial
 import os
 import warnings
+from functools import partial
 
 import numpy as np
 
-from dipy.data import get_sphere
+import fury.primitive as fp
 from fury import layout as lyt
 from fury.actors.odf import sh_odf
-from fury.actors.odf_calc import sh_odf_calc
 from fury.actors.odf_slicer import OdfSlicerActor
 from fury.actors.peak import PeakActor
 from fury.actors.tensor import (
@@ -39,8 +38,8 @@ from fury.lib import (
     ImageData,
     ImageMapToColors,
     ImageReslice,
-    LODActor,
     LinearExtrusionFilter,
+    LODActor,
     LookupTable,
     LoopSubdivisionFilter,
     Matrix4x4,
@@ -55,9 +54,9 @@ from fury.lib import (
     SplineFilter,
     TextActor3D,
     Texture,
-    TextureMapToPlane,
     TexturedActor2D,
     TexturedSphereSource,
+    TextureMapToPlane,
     Transform,
     TransformPolyDataFilter,
     TriangleFilter,
@@ -65,7 +64,6 @@ from fury.lib import (
     VectorText,
     numpy_support,
 )
-import fury.primitive as fp
 from fury.shaders import (
     add_shader_callback,
     attribute_to_actor,
@@ -230,7 +228,9 @@ def slicer(
 
     ex1, ex2, ey1, ey2, ez1, ez2 = vtk_resliced_data.GetExtent()
 
-    resliced = numpy_support.vtk_to_numpy(vtk_resliced_data.GetPointData().GetScalars())
+    resliced = numpy_support.vtk_to_numpy(
+        vtk_resliced_data.GetPointData().GetScalars()
+    )
 
     # swap axes here
     if data.ndim == 4:
@@ -399,7 +399,9 @@ def surface(vertices, *, faces=None, colors=None, smooth=None, subdivision=3):
     triangle_poly_data.SetPoints(points)
 
     if colors is not None:
-        triangle_poly_data.GetPointData().SetScalars(numpy_to_vtk_colors(255 * colors))
+        triangle_poly_data.GetPointData().SetScalars(
+            numpy_to_vtk_colors(255 * colors)
+        )
 
     if faces is None:
         tri = Delaunay(vertices[:, [0, 1]])
@@ -742,7 +744,9 @@ def streamtube(
     poly_mapper = set_input(PolyDataMapper(), next_input)
     if replace_strips:
         triangle_filter = set_input(TriangleFilter(), next_input)
-        poly_mapper = set_input(PolyDataMapper(), triangle_filter.GetOutputPort())
+        poly_mapper = set_input(
+            PolyDataMapper(), triangle_filter.GetOutputPort()
+        )
 
     else:
         poly_mapper = set_input(PolyDataMapper(), next_input)
@@ -906,7 +910,9 @@ def line(
             if program is not None:
                 program.SetUniformf("linewidth", linewidth)
 
-        replace_shader_in_actor(actor, "geometry", import_fury_shader("line.geom"))
+        replace_shader_in_actor(
+            actor, "geometry", import_fury_shader("line.geom")
+        )
         add_shader_callback(actor, callback)
 
     if fake_tube:
@@ -979,10 +985,14 @@ def axes(
     """
     centers = np.zeros((3, 3))
     dirs = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-    colors = np.array([colorx + (opacity,), colory + (opacity,), colorz + (opacity,)])
+    colors = np.array(
+        [colorx + (opacity,), colory + (opacity,), colorz + (opacity,)]
+    )
 
     scales = np.asarray(scale)
-    arrow_actor = arrow(centers, dirs, colors, scales=scales, repeat_primitive=False)
+    arrow_actor = arrow(
+        centers, dirs, colors, scales=scales, repeat_primitive=False
+    )
     return arrow_actor
 
 
@@ -1068,14 +1078,14 @@ def odf_slicer(
     if B_matrix is None:
         if len(vertices) != odfs.shape[-1]:
             raise ValueError(
-                "Invalid number of SF coefficients. " "Expected {0}, got {1}.".format(
-                    len(vertices), odfs.shape[-1]
-                )
+                "Invalid number of SF coefficients. "
+                "Expected {0}, got {1}.".format(len(vertices), odfs.shape[-1])
             )
     else:
         if len(vertices) != B_matrix.shape[1]:
             raise ValueError(
-                "Invalid number of SH coefficients. " "Expected {0}, got {1}.".format(
+                "Invalid number of SH coefficients. "
+                "Expected {0}, got {1}.".format(
                     len(vertices), B_matrix.shape[1]
                 )
             )
@@ -1404,7 +1414,8 @@ def _tensor_slicer_mapper(
     all_faces = np.concatenate(all_faces)
 
     cols = np.ascontiguousarray(
-        np.reshape(cols, (cols.shape[0] * cols.shape[1], cols.shape[2])), dtype="f4"
+        np.reshape(cols, (cols.shape[0] * cols.shape[1], cols.shape[2])),
+        dtype="f4",
     )
 
     vtk_colors = numpy_support.numpy_to_vtk(
@@ -1531,7 +1542,9 @@ def peak_slicer(
                             )
                         )
                     else:
-                        dirs = np.vstack((xyz, peaks_dirs[tuple(center)][i] * pv + xyz))
+                        dirs = np.vstack(
+                            (xyz, peaks_dirs[tuple(center)][i] * pv + xyz)
+                        )
                     list_dirs.append(dirs)
 
             self.line = line(
@@ -1727,7 +1740,9 @@ def dot(points, *, colors=None, opacity=None, dot_size=5):
     if points.shape[1] != 3:
         raise ValueError(
             "Invalid points. The shape of the last dimension "
-            "must be 3. Your data has a last dimension of {}.".format(points.shape[1])
+            "must be 3. Your data has a last dimension of {}.".format(
+                points.shape[1]
+            )
         )
 
     vtk_vertices = Points()
@@ -1973,9 +1988,7 @@ def cylinder(
             raise ValueError("resolution parameter should be greater than 7")
 
         verts, faces = fp.prim_cylinder(
-            radius=radius,
-            sectors=resolution,
-            capped=capped,
+            radius=radius, sectors=resolution, capped=capped
         )
         res = fp.repeat_primitive(
             verts,
@@ -1998,7 +2011,9 @@ def cylinder(
             src.SetCapping(capped)
             src.SetResolution(resolution)
             src.SetRadius(radius)
-            rotate = np.array([[0, 1, 0, 0], [-1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]])
+            rotate = np.array(
+                [[0, 1, 0, 0], [-1, 0, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+            )
         else:
             src = None
             rotate = None
@@ -2078,7 +2093,9 @@ def disk(
         src.SetRadialResolution(rresolution)
         src.SetInnerRadius(rinner)
         src.SetOuterRadius(router)
-        rotate = np.array([[0, 0, -1, 0], [0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 0, 1]])
+        rotate = np.array(
+            [[0, 0, -1, 0], [0, 1, 0, 0], [1, 0, 0, 0], [0, 0, 0, 1]]
+        )
     else:
         src = None
         rotate = None
@@ -2146,7 +2163,9 @@ def square(centers, *, directions=(1, 0, 0), colors=(1, 0, 0), scales=1):
 
 
 @warn_on_args_to_kwargs()
-def rectangle(centers, *, directions=(1, 0, 0), colors=(1, 0, 0), scales=(1, 2, 0)):
+def rectangle(
+    centers, *, directions=(1, 0, 0), colors=(1, 0, 0), scales=(1, 2, 0)
+):
     """Visualize one or many rectangles with different features.
 
     Parameters
@@ -2179,7 +2198,9 @@ def rectangle(centers, *, directions=(1, 0, 0), colors=(1, 0, 0), scales=(1, 2, 
     >>> # window.show(scene)
 
     """
-    return square(centers=centers, directions=directions, colors=colors, scales=scales)
+    return square(
+        centers=centers, directions=directions, colors=colors, scales=scales
+    )
 
 
 @warn_on_args_to_kwargs()
@@ -2260,7 +2281,9 @@ def cube(centers, *, directions=(1, 0, 0), colors=(1, 0, 0), scales=1):
     >>> # window.show(scene)
 
     """
-    return box(centers=centers, directions=directions, colors=colors, scales=scales)
+    return box(
+        centers=centers, directions=directions, colors=colors, scales=scales
+    )
 
 
 @warn_on_args_to_kwargs()
@@ -2432,7 +2455,12 @@ def cone(
         vertices, faces = fp.prim_cone(sectors=resolution)
 
     res = fp.repeat_primitive(
-        vertices, faces, centers, directions=directions, colors=colors, scales=heights
+        vertices,
+        faces,
+        centers,
+        directions=directions,
+        colors=colors,
+        scales=heights,
     )
 
     big_verts, big_faces, big_colors, _ = res
@@ -2445,7 +2473,9 @@ def cone(
 
 
 @warn_on_args_to_kwargs()
-def triangularprism(centers, *, directions=(1, 0, 0), colors=(1, 0, 0), scales=1):
+def triangularprism(
+    centers, *, directions=(1, 0, 0), colors=(1, 0, 0), scales=1
+):
     """Visualize one or many regular triangular prisms with different features.
 
     Parameters
@@ -2494,7 +2524,9 @@ def triangularprism(centers, *, directions=(1, 0, 0), colors=(1, 0, 0), scales=1
 
 
 @warn_on_args_to_kwargs()
-def rhombicuboctahedron(centers, *, directions=(1, 0, 0), colors=(1, 0, 0), scales=1):
+def rhombicuboctahedron(
+    centers, *, directions=(1, 0, 0), colors=(1, 0, 0), scales=1
+):
     """Visualize one or many rhombicuboctahedron with different features.
 
     Parameters
@@ -2543,7 +2575,9 @@ def rhombicuboctahedron(centers, *, directions=(1, 0, 0), colors=(1, 0, 0), scal
 
 
 @warn_on_args_to_kwargs()
-def pentagonalprism(centers, *, directions=(1, 0, 0), colors=(1, 0, 0), scales=1):
+def pentagonalprism(
+    centers, *, directions=(1, 0, 0), colors=(1, 0, 0), scales=1
+):
     """Visualize one or many pentagonal prisms with different features.
 
     Parameters
@@ -2594,7 +2628,9 @@ def pentagonalprism(centers, *, directions=(1, 0, 0), colors=(1, 0, 0), scales=1
 
 
 @warn_on_args_to_kwargs()
-def octagonalprism(centers, *, directions=(1, 0, 0), colors=(1, 0, 0), scales=1):
+def octagonalprism(
+    centers, *, directions=(1, 0, 0), colors=(1, 0, 0), scales=1
+):
     """Visualize one or many octagonal prisms with different features.
 
     Parameters
@@ -2695,7 +2731,12 @@ def frustum(centers, *, directions=(1, 0, 0), colors=(0, 1, 0), scales=1):
 
 @warn_on_args_to_kwargs()
 def superquadric(
-    centers, *, roundness=(1, 1), directions=(1, 0, 0), colors=(1, 0, 0), scales=1
+    centers,
+    *,
+    roundness=(1, 1),
+    directions=(1, 0, 0),
+    colors=(1, 0, 0),
+    scales=1,
 ):
     """Visualize one or many superquadrics with different features.
 
@@ -2829,28 +2870,38 @@ def billboard(
     bb_actor.GetProperty().BackfaceCullingOff()
     attribute_to_actor(bb_actor, big_centers, "center")
 
-    bb_norm = import_fury_shader(os.path.join("utils", "billboard_normalization.glsl"))
+    bb_norm = import_fury_shader(
+        os.path.join("utils", "billboard_normalization.glsl")
+    )
 
     if bb_type.lower() == "cylindrical_x":
-        bb_type_sd = import_fury_shader(os.path.join("billboard", "cylindrical_x.glsl"))
+        bb_type_sd = import_fury_shader(
+            os.path.join("billboard", "cylindrical_x.glsl")
+        )
         v_pos_mc = """
             vec3 vertexPositionMC = cylindricalXVertexPos(center, MCVCMatrix,
                                         normalizedVertexMCVSOutput, shape);
             """
     elif bb_type.lower() == "cylindrical_y":
-        bb_type_sd = import_fury_shader(os.path.join("billboard", "cylindrical_y.glsl"))
+        bb_type_sd = import_fury_shader(
+            os.path.join("billboard", "cylindrical_y.glsl")
+        )
         v_pos_mc = """
             vec3 vertexPositionMC = cylindricalYVertexPos(center,MCVCMatrix,
                                         normalizedVertexMCVSOutput, shape);
             """
     elif bb_type.lower() == "spherical":
-        bb_type_sd = import_fury_shader(os.path.join("billboard", "spherical.glsl"))
+        bb_type_sd = import_fury_shader(
+            os.path.join("billboard", "spherical.glsl")
+        )
         v_pos_mc = """
             vec3 vertexPositionMC = sphericalVertexPos(center, MCVCMatrix,
                                         normalizedVertexMCVSOutput, shape);
             """
     else:
-        bb_type_sd = import_fury_shader(os.path.join("billboard", "spherical.glsl"))
+        bb_type_sd = import_fury_shader(
+            os.path.join("billboard", "spherical.glsl")
+        )
         v_pos_mc = """
             vec3 vertexPositionMC = sphericalVertexPos(center, MCVCMatrix,
                                         normalizedVertexMCVSOutput, shape);
@@ -2897,21 +2948,31 @@ def billboard(
         fragOutput0 = vec4(color, 1.);
         """
 
-    billboard_vert_impl = compose_shader([billboard_impl_vert, v_pos_mc, gl_position])
+    billboard_vert_impl = compose_shader(
+        [billboard_impl_vert, v_pos_mc, gl_position]
+    )
 
     vs_dec_code = compose_shader(
         [billboard_dec_vert, compose_shader(vs_dec), bb_norm, bb_type_sd]
     )
-    vs_impl_code = compose_shader([compose_shader(vs_impl), billboard_vert_impl])
+    vs_impl_code = compose_shader(
+        [compose_shader(vs_impl), billboard_vert_impl]
+    )
 
     gs_code = compose_shader(gs_prog)
     fs_dec_code = compose_shader([billboard_dec_frag, compose_shader(fs_dec)])
-    fs_impl_code = compose_shader([billboard_impl_frag, compose_shader(fs_impl)])
+    fs_impl_code = compose_shader(
+        [billboard_impl_frag, compose_shader(fs_impl)]
+    )
 
-    shader_to_actor(bb_actor, "vertex", impl_code=vs_impl_code, decl_code=vs_dec_code)
+    shader_to_actor(
+        bb_actor, "vertex", impl_code=vs_impl_code, decl_code=vs_dec_code
+    )
     replace_shader_in_actor(bb_actor, "geometry", gs_code)
     shader_to_actor(bb_actor, "fragment", decl_code=fs_dec_code)
-    shader_to_actor(bb_actor, "fragment", impl_code=fs_impl_code, block="light")
+    shader_to_actor(
+        bb_actor, "fragment", impl_code=fs_impl_code, block="light"
+    )
 
     return bb_actor
 
@@ -3081,7 +3142,9 @@ def text_3d(
             elif justification == "right":
                 tprop.SetJustificationToRight()
             else:
-                raise ValueError("Unknown justification: '{}'".format(justification))
+                raise ValueError(
+                    "Unknown justification: '{}'".format(justification)
+                )
 
         def vertical_justification(self, justification):
             tprop = self.GetTextProperty()
@@ -3093,7 +3156,9 @@ def text_3d(
                 tprop.SetVerticalJustificationToBottom()
             else:
                 raise ValueError(
-                    "Unknown vertical justification: '{}'".format(justification)
+                    "Unknown vertical justification: '{}'".format(
+                        justification
+                    )
                 )
 
         @warn_on_args_to_kwargs()
@@ -3361,7 +3426,9 @@ def grid(
             # We change the anchor of the container so
             # the actor will be centered in the
             # grid cell.
-            actor_with_caption.anchor = actor_center - actor_with_caption.GetCenter()
+            actor_with_caption.anchor = (
+                actor_center - actor_with_caption.GetCenter()
+            )
             actors_with_caption.append(actor_with_caption)
 
         actors = actors_with_caption
@@ -3394,7 +3461,9 @@ def figure(pic, *, interpolation="nearest"):
 
             # width, height
             vtk_image_data.SetDimensions(pic.shape[1], pic.shape[0], 1)
-            vtk_image_data.SetExtent(0, pic.shape[1] - 1, 0, pic.shape[0] - 1, 0, 0)
+            vtk_image_data.SetExtent(
+                0, pic.shape[1] - 1, 0, pic.shape[0] - 1, 0, 0
+            )
             pic_tmp = np.swapaxes(pic, 0, 1)
             pic_tmp = pic.reshape(pic.shape[1] * pic.shape[0], 4)
             pic_tmp = np.ascontiguousarray(pic_tmp)
@@ -3492,7 +3561,9 @@ def texture_update(texture_actor, arr):
     """
     grid = texture_actor.GetTexture().GetInput()
     dim = arr.shape[-1]
-    img_data = np.flip(arr.swapaxes(0, 1), axis=1).reshape((-1, dim), order="F")
+    img_data = np.flip(arr.swapaxes(0, 1), axis=1).reshape(
+        (-1, dim), order="F"
+    )
     vtkarr = numpy_support.numpy_to_vtk(img_data, deep=False)
     grid.GetPointData().SetScalars(vtkarr)
 
@@ -3626,7 +3697,12 @@ def texture_2d(rgb, *, interp=False):
 
 @warn_on_args_to_kwargs()
 def sdf(
-    centers, *, directions=(1, 0, 0), colors=(1, 0, 0), primitives="torus", scales=1
+    centers,
+    *,
+    directions=(1, 0, 0),
+    colors=(1, 0, 0),
+    primitives="torus",
+    scales=1,
 ):
     """Create a SDF primitive based actor.
 
@@ -3687,7 +3763,10 @@ def sdf(
     else:
         rep_scales = np.repeat(scales, rep_centers.shape[0], axis=0)
 
-    if isinstance(directions, (list, tuple, np.ndarray)) and len(directions) == 3:
+    if (
+        isinstance(directions, (list, tuple, np.ndarray))
+        and len(directions) == 3
+    ):
         rep_directions = np.repeat(directions, rep_centers.shape[0], axis=0)
     else:
         rep_directions = np.repeat(directions, verts.shape[0], axis=0)
@@ -3702,9 +3781,13 @@ def sdf(
     fs_dec_code = import_fury_shader("sdf_dec.frag")
     fs_impl_code = import_fury_shader("sdf_impl.frag")
 
-    shader_to_actor(box_actor, "vertex", impl_code=vs_impl_code, decl_code=vs_dec_code)
+    shader_to_actor(
+        box_actor, "vertex", impl_code=vs_impl_code, decl_code=vs_dec_code
+    )
     shader_to_actor(box_actor, "fragment", decl_code=fs_dec_code)
-    shader_to_actor(box_actor, "fragment", impl_code=fs_impl_code, block="light")
+    shader_to_actor(
+        box_actor, "fragment", impl_code=fs_impl_code, block="light"
+    )
     return box_actor
 
 
@@ -3808,7 +3891,9 @@ def markers(
         out vec3 centerVertexMCVSOutput;
         out vec3 normalizedVertexMCVSOutput;
         """
-    vs_dec_code += f'\n{import_fury_shader("utils/billboard_normalization.glsl")}'
+    vs_dec_code += (
+        f'\n{import_fury_shader("utils/billboard_normalization.glsl")}'
+    )
     vs_dec_code += f'\n{import_fury_shader("billboard/spherical.glsl")}'
     vs_dec_code += f'\n{import_fury_shader("marker_billboard_dec.vert")}'
     vs_impl_code = """
@@ -3858,11 +3943,18 @@ def markers(
     ):
         program = calldata
         if program is not None:
-            program.__getattribute__(f"SetUniform{uniform_type}")(uniform_name, value)
+            program.__getattribute__(f"SetUniform{uniform_type}")(
+                uniform_name, value
+            )
 
     add_shader_callback(
         sq_actor,
-        partial(callback, uniform_type="f", uniform_name="edgeWidth", value=edge_width),
+        partial(
+            callback,
+            uniform_type="f",
+            uniform_name="edgeWidth",
+            value=edge_width,
+        ),
     )
     add_shader_callback(
         sq_actor,
@@ -3876,32 +3968,36 @@ def markers(
     add_shader_callback(
         sq_actor,
         partial(
-            callback, uniform_type="f", uniform_name="edgeOpacity", value=edge_opacity
+            callback,
+            uniform_type="f",
+            uniform_name="edgeOpacity",
+            value=edge_opacity,
         ),
     )
     add_shader_callback(
         sq_actor,
         partial(
-            callback, uniform_type="3f", uniform_name="edgeColor", value=edge_color
+            callback,
+            uniform_type="3f",
+            uniform_name="edgeColor",
+            value=edge_color,
         ),
     )
 
-    shader_to_actor(sq_actor, "vertex", impl_code=vs_impl_code, decl_code=vs_dec_code)
+    shader_to_actor(
+        sq_actor, "vertex", impl_code=vs_impl_code, decl_code=vs_dec_code
+    )
     shader_to_actor(sq_actor, "fragment", decl_code=fs_dec_code)
-    shader_to_actor(sq_actor, "fragment", impl_code=fs_impl_code, block="light")
+    shader_to_actor(
+        sq_actor, "fragment", impl_code=fs_impl_code, block="light"
+    )
 
     return sq_actor
 
 
 @warn_on_args_to_kwargs()
 def ellipsoid(
-    centers,
-    axes,
-    lengths,
-    *,
-    colors=(1, 0, 0),
-    scales=1.0,
-    opacity=1.0,
+    centers, axes, lengths, *, colors=(1, 0, 0), scales=1.0, opacity=1.0
 ):
     """VTK actor for visualizing ellipsoids.
 
@@ -3969,14 +4065,7 @@ def ellipsoid(
 
 @warn_on_args_to_kwargs()
 def uncertainty_cone(
-    evals,
-    evecs,
-    signal,
-    sigma,
-    b_matrix,
-    *,
-    scales=0.6,
-    opacity=1.0,
+    evals, evecs, signal, sigma, b_matrix, *, scales=0.6, opacity=1.0
 ):
     """VTK actor for visualizing the cone of uncertainty representing the
     variance of the main direction of diffusion.
@@ -4088,7 +4177,9 @@ def odf(centers, coeffs, sh_basis="descoteaux", scales=1.0, opacity=1.0):
     return sh_odf(centers, coeffs, degree, sh_basis, scales, opacity)
 
 
-def odf_impl(centers, coeffs, sphere_type="repulsion100", scales=.5, opacity=1.0):
+def odf_impl(
+    centers, coeffs, sphere_type="repulsion100", scales=0.5, opacity=1.0
+):
     """
     FURY actor for visualizing Orientation Distribution Functions (ODFs) using descoteaux07 basis given an array of Spherical Harmonics (SH) coefficients.
 
@@ -4140,7 +4231,7 @@ def odf_impl(centers, coeffs, sphere_type="repulsion100", scales=.5, opacity=1.0
             (scales, np.ones(centers.shape[0] - scales.shape[0])), axis=None
         )
 
-    #total = np.sum(abs(coeffs), axis=1)
-    #coeffs = np.dot(np.diag(1 / total * scales), coeffs) * 1.7
+    # total = np.sum(abs(coeffs), axis=1)
+    # coeffs = np.dot(np.diag(1 / total * scales), coeffs) * 1.7
 
     return sh_odf_calc(centers, coeffs, sphere_type, scales, opacity)
