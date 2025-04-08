@@ -67,7 +67,6 @@ def ghissue_role(name, rawtext, text, lineno, inliner, options=None, content=Non
     :param options: Directive options for customization.
     :param content: The directive content for customization.
     """
-
     if options is None:
         options = {}
 
