@@ -28,7 +28,6 @@ from urllib.request import urlopen
 
 from PIL import Image, UnidentifiedImageError
 import numpy as np
-from PIL import Image, UnidentifiedImageError
 
 from fury.data import read_viz_icons
 from fury.decorators import warn_on_args_to_kwargs
