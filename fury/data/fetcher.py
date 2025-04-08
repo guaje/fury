@@ -333,7 +333,6 @@ async def _download(session, url, filename, *, size=None):
         Name of the downloaded file (e.g. BoxTextured.gltf)
     size : int, optional
         Length of the content in bytes
-    
     """
     if not os.path.exists(filename):
         print(f"Downloading: {filename}")
