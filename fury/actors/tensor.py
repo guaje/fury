@@ -147,28 +147,14 @@ def tensor_ellipsoid(centers, axes, lengths, colors, scales, opacity):
         }
         """
 
-    # SDF Evaluation
-    sdf_eval = """
-        float sdfEval(in vec3 position)
-        {
-            return map(position);
-        }
-        """
-
     # Importing central differences function for computing surface normals
-    central_diffs_normal = import_fury_shader(
-        os.path.join("sdf", "central_diffs.frag")
-    )
+    central_diffs_normal = import_fury_shader(os.path.join("sdf", "central_diffs.frag"))
 
     # Importing raymarching function
-    cast_ray = import_fury_shader(
-        os.path.join("ray_marching", "cast_ray.frag")
-    )
+    cast_ray = import_fury_shader(os.path.join("ray_marching", "cast_ray.frag"))
 
     # Importing the function that generates the ray components
-    ray_generation = import_fury_shader(
-        os.path.join("ray_marching", "gen_ray.frag")
-    )
+    ray_generation = import_fury_shader(os.path.join("ray_marching", "gen_ray.frag"))
 
     # Importing Blinn-Phong model for lighting
     blinn_phong_model = import_fury_shader(
@@ -181,7 +167,6 @@ def tensor_ellipsoid(centers, axes, lengths, colors, scales, opacity):
             fs_vars_dec,
             sd_sphere,
             sdf_map,
-            sdf_eval,
             central_diffs_normal,
             cast_ray,
             ray_generation,
@@ -220,9 +205,7 @@ def tensor_ellipsoid(centers, axes, lengths, colors, scales, opacity):
     # Full fragment shader implementation
     sdf_frag_impl = compose_shader([ray_components, frag_output_def])
 
-    shader_to_actor(
-        box_actor, "fragment", impl_code=sdf_frag_impl, block="light"
-    )
+    shader_to_actor(box_actor, "fragment", impl_code=sdf_frag_impl, block="light")
 
     return box_actor
 
@@ -345,28 +328,14 @@ def double_cone(centers, axes, angles, colors, scales, opacity):
         }
         """
 
-    # SDF Evaluation
-    sdf_eval = """
-        float sdfEval(in vec3 position)
-        {
-            return map(position);
-        }
-        """
-
     # Importing central differences function for computing surface normals
-    central_diffs_normal = import_fury_shader(
-        os.path.join("sdf", "central_diffs.frag")
-    )
+    central_diffs_normal = import_fury_shader(os.path.join("sdf", "central_diffs.frag"))
 
     # Importing raymarching function
-    cast_ray = import_fury_shader(
-        os.path.join("ray_marching", "cast_ray.frag")
-    )
+    cast_ray = import_fury_shader(os.path.join("ray_marching", "cast_ray.frag"))
 
     # Importing the function that generates the ray components
-    ray_generation = import_fury_shader(
-        os.path.join("ray_marching", "gen_ray.frag")
-    )
+    ray_generation = import_fury_shader(os.path.join("ray_marching", "gen_ray.frag"))
 
     # Importing Blinn-Phong model for lighting
     blinn_phong_model = import_fury_shader(
@@ -380,7 +349,6 @@ def double_cone(centers, axes, angles, colors, scales, opacity):
             sd_cone,
             sd_union,
             sdf_map,
-            sdf_eval,
             central_diffs_normal,
             cast_ray,
             ray_generation,
@@ -419,9 +387,7 @@ def double_cone(centers, axes, angles, colors, scales, opacity):
     # Full fragment shader implementation
     sdf_frag_impl = compose_shader([ray_components, frag_output_def])
 
-    shader_to_actor(
-        box_actor, "fragment", impl_code=sdf_frag_impl, block="light"
-    )
+    shader_to_actor(box_actor, "fragment", impl_code=sdf_frag_impl, block="light")
 
     return box_actor
 
@@ -490,11 +456,7 @@ def main_dir_uncertainty(evals, evecs, signal, sigma, b_matrix):
 
         dd = np.diag(sigma_)
         delta_DD = np.array(
-            [
-                [dd[0], dd[3], dd[4]],
-                [dd[3], dd[1], dd[5]],
-                [dd[4], dd[5], dd[2]],
-            ]
+            [[dd[0], dd[3], dd[4]], [dd[3], dd[1], dd[5]], [dd[4], dd[5], dd[2]]]
         )
 
         # perturbation matrix of tensor D
@@ -506,24 +468,18 @@ def main_dir_uncertainty(evals, evecs, signal, sigma, b_matrix):
         D_ = evecs
         eigen_vals = evals[i]
 
-        e1, e2, e3 = (
-            np.array(D_[i, :, 0]),
-            np.array(D_[i, :, 1]),
-            np.array(D_[i, :, 2]),
-        )
+        e1, e2, e3 = (np.array(D_[i, :, 0]), np.array(D_[i, :, 1]), np.array(D_[i, :, 2]))
         lambda1, lambda2, lambda3 = eigen_vals[0], eigen_vals[1], eigen_vals[2]
 
         if lambda1 > lambda2 and lambda1 > lambda3:
             # The perturbation of the eigenvector associated with the largest
             # eigenvalue is given by
             a = np.dot(
-                np.outer(np.dot(e1, delta_D), np.transpose(e2))
-                / (lambda1 - lambda2),
+                np.outer(np.dot(e1, delta_D), np.transpose(e2)) / (lambda1 - lambda2),
                 e2,
             )
             b = np.dot(
-                np.outer(np.dot(e1, delta_D), np.transpose(e3))
-                / (lambda1 - lambda3),
+                np.outer(np.dot(e1, delta_D), np.transpose(e3)) / (lambda1 - lambda3),
                 e3,
             )
             delta_e1 = a + b
