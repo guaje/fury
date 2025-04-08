@@ -8,7 +8,6 @@ from warnings import warn
 import numpy as np
 from scipy import ndimage
 
-import fury.animation as anim
 from fury import __version__ as fury_version
 import fury.animation as anim
 from fury.decorators import warn_on_args_to_kwargs
