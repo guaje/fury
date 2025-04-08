@@ -2,13 +2,17 @@
 This spript includes the basic implementation of Spherical Harmonics
 """
 
-import numpy as np
 import os
 
-from fury import actor, window
-from fury.shaders import (attribute_to_actor, compose_shader,
-                          import_fury_shader, shader_to_actor)
+import numpy as np
 
+from fury import actor, window
+from fury.shaders import (
+    attribute_to_actor,
+    compose_shader,
+    import_fury_shader,
+    shader_to_actor,
+)
 
 if __name__ == '__main__':
     centers = np.array([[0, -1, 0], [1.0, -1, 0], [2.0, -1, 0], [3.0, -1, 0]])
@@ -138,7 +142,7 @@ if __name__ == '__main__':
                 );
 
                 float u1 = sqrt(
-                    (k1 * m1 * (m2 + 4.0)) / 
+                    (k1 * m1 * (m2 + 4.0)) /
                     ((k1 + 1.0) * (m1 + 1.0) * m2)
                 );
 
@@ -158,7 +162,7 @@ if __name__ == '__main__':
             return p0;
         }
 
-        float SH( in int l, in int m, in vec3 s ) 
+        float SH( in int l, in int m, in vec3 s )
         {
             vec3 ns = normalize(s);
 
@@ -188,8 +192,8 @@ if __name__ == '__main__':
 
             #define SHAPE (vec3(d-abs(r), sign(r),d))
             d=length(p00);
-            n=p00/d; 
-            float sc = scaleVSOutput;            
+            n=p00/d;
+            float sc = scaleVSOutput;
             r = coeffs[0]*SH(0, 0, n)*sc;
             r += coeffs[1]*SH(2, -2, n)*sc;
             r += coeffs[2]*SH(2, -1, n)*sc;
@@ -288,9 +292,9 @@ if __name__ == '__main__':
 
             // lights
             vec3 lin  = 2.5*occ*vec3(1.0,1.0,1.0)*(0.6+0.4*normal.y);
-            lin += 1.0*sss*vec3(1.0,0.95,0.70)*occ;	
+            lin += 1.0*sss*vec3(1.0,0.95,0.70)*occ;
 
-            vec3 mater = 0.5*mix( vec3(1.0,1.0,0.0), vec3(1.0,1.0,1.0), t.y); 	
+            vec3 mater = 0.5*mix( vec3(1.0,1.0,0.0), vec3(1.0,1.0,1.0), t.y);
 
             fragOutput0 = vec4( lin, 1.0);
 
@@ -316,8 +320,8 @@ if __name__ == '__main__':
     show_manager.scene.add(box_sd_stg_actor3)
     show_manager.scene.add(box_sd_stg_actor4)
 
-    from dipy.reconst.shm import sh_to_sf
     from dipy.data import get_sphere
+    from dipy.reconst.shm import sh_to_sf
 
     sphere = get_sphere('repulsion724')
 
